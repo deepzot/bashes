@@ -19,7 +19,6 @@ class Estimator(object):
             self.nFeatures = featureMatrix.shape[0]
         else:
             self.nFeatures = self.nPixels
-        print 'nFeatures=',self.nFeatures
 
         # Save the data as feature vectors for each stamp.
         assert len(data.shape) in (2,3), 'Expected 2D or 3D input data'
@@ -39,7 +38,6 @@ class Estimator(object):
         else:
             # Handle a 3D array of data stamps...
             assert False,'3D data array not supported yet'
-        print self.data.shape
 
         # Save the PSF image for each stamp.
         if psfs.shape == (self.stampSize,self.stampSize):

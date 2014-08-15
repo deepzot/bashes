@@ -4,6 +4,7 @@ import os
 import os.path
 import argparse
 
+import numpy as np
 from astropy.io import fits
 import yaml
 
@@ -13,13 +14,23 @@ def main():
 
     # Parse command-line args.
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('--ds9', action = 'store_true',
+        help = 'display results in DS9')
     parser.add_argument('--branch', type = str, default = 'control/ground/constant',
         help = 'Name of branch to use relative to $GREAT3_ROOT')
     parser.add_argument('--field', type = int, default = 0,
         help = 'Index of field to analyze (0-199)')
     parser.add_argument('--epoch', type = int, default = 0,
         help = 'Epoch number to analyze')
+    parser.add_argument('--pixel-scale', type = float, default = 0.2,
+        help = 'Pixel scale in arcsecs')
     args = parser.parse_args()
+
+    # initialize the optional display
+    if args.ds9:
+        display = bashes.Display('cmap heat; scale sqrt')
+    else:
+        display = None
 
     # Lookup the path to the GREAT3 branch we will use.
     if 'GREAT3_ROOT' not in os.environ:
@@ -50,16 +61,37 @@ def main():
     constPsf = hduList[0].data[:stampSize,:stampSize]
     hduList.close()
 
-    # Load the simulation truth for this data.
+    # Load the true noise variance used to simulate this epoch.
     truthParamsPath = os.path.join(os.environ['GREAT3_ROOT'],'truth',args.branch,
         'epoch_parameters-%03d-%d.yaml' % (args.field,args.epoch))
     with open(truthParamsPath,'r') as f:
         params = yaml.load(f)
-        noiseVar = params['noise']['variance']
+        noiseVarTruth = params['noise']['variance']
+
+    # Load the per-galaxy source properties used to simulate this epoch.
+    truthCatalogPath = os.path.join(os.environ['GREAT3_ROOT'],'truth',args.branch,
+        'epoch_catalog-%03d-%d.fits' % (args.field,args.epoch))
+    hduList = fits.open(truthCatalogPath)
+    truthCatalog = hduList[1].data
+    hduList.close()
+
+    if display:
+        # Display the PSF stamp.
+        display.show(constPsf)
+        psf = bashes.great3.createPSF(truthCatalog[0])
+        psfStamp = bashes.render(psf,args.pixel_scale,stampSize)
+        display.show(psfStamp)
+        # Display the first data stamp.
+        firstStamp = dataStamps[:stampSize,:stampSize]
+        display.show(firstStamp)
+        # Display our reconstruction of the first data stamp.
+        src = bashes.great3.createSource(truthCatalog[0])
+        srcStamp = bashes.render(src,args.pixel_scale,stampSize)
+        display.show(srcStamp)
 
     # Build the estimator for this analysis.
     estimator = bashes.Estimator(
-        data=dataStamps,psfs=constPsf,ivar=1./noiseVar,
+        data=dataStamps,psfs=constPsf,ivar=1./noiseVarTruth,
         stampSize=stampSize)
 
 if __name__ == '__main__':

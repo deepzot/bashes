@@ -3,7 +3,7 @@ Supports interactive display to a separate DS9 process via XPA. For documentatio
 see http://hea-www.harvard.edu/saord/ds9/ref/xpa.html
 """
 
-import numpy
+import numpy as np
 
 class Display(object):
     """
@@ -58,15 +58,15 @@ class Display(object):
             limits = self.get('scale limits')
         else:
             if min is None:
-                min = numpy.min(image)
+                min = np.min(image)
             if max is None:
-                max = numpy.max(image)
+                max = np.max(image)
             limits = "%g %g" % (min,max)
         # create a new frame unless this is the first time we have been called
         if self.frames > 0:
             self.display.set('frame new')
         # display the numpy array
-        self.display.set_np2arr(image)
+        self.display.set_np2arr(image.astype(np.float32))
         self.display.set('scale limits %s' % limits)
         # zoom to fit
         self.display.set('zoom to fit')
