@@ -5,6 +5,7 @@ import os.path
 import argparse
 
 from astropy.io import fits
+import yaml
 
 import bashes
 
@@ -12,17 +13,19 @@ def main():
 
     # Parse command-line args.
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--path', type = str, default = 'control/ground/constant',
-        help = 'Path of constant-psf branch to use relative to $GREAT3_ROOT')
+    parser.add_argument('--branch', type = str, default = 'control/ground/constant',
+        help = 'Name of branch to use relative to $GREAT3_ROOT')
     parser.add_argument('--field', type = int, default = 0,
         help = 'Index of field to analyze (0-199)')
+    parser.add_argument('--epoch', type = int, default = 0,
+        help = 'Epoch number to analyze')
     args = parser.parse_args()
 
     # Lookup the path to the GREAT3 branch we will use.
     if 'GREAT3_ROOT' not in os.environ:
         print '$GREAT3_ROOT is not set.'
         return -1
-    branchPath = os.path.join(os.environ['GREAT3_ROOT'],args.path)
+    branchPath = os.path.join(os.environ['GREAT3_ROOT'],args.branch)
     if not os.path.isdir(branchPath):
         print 'No such directory:',branchPath
         return -1
@@ -47,12 +50,16 @@ def main():
     constPsf = hduList[0].data[:stampSize,:stampSize]
     hduList.close()
 
-    # Will eventually load the noise variance from the truth catalog...
-    noiseRms = 0.070
+    # Load the simulation truth for this data.
+    truthParamsPath = os.path.join(os.environ['GREAT3_ROOT'],'truth',args.branch,
+        'epoch_parameters-%03d-%d.yaml' % (args.field,args.epoch))
+    with open(truthParamsPath,'r') as f:
+        params = yaml.load(f)
+        noiseVar = params['noise']['variance']
 
     # Build the estimator for this analysis.
     estimator = bashes.Estimator(
-        data=dataStamps,psfs=constPsf,ivar=1/noiseRms**2,
+        data=dataStamps,psfs=constPsf,ivar=1./noiseVar,
         stampSize=stampSize)
 
 if __name__ == '__main__':
