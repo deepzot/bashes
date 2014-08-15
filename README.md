@@ -1,8 +1,8 @@
 bashes
 ======
 
-Bayesian shear estimation optimized for GPUs
+Bayesian shear estimation optimized for GPUs.
 
-Required python packages: numpy,scipy,galsim.
+Required python modules: numpy,scipy,astropy,yaml,galsim.
 
-Optional python packages: pyds9
+Optional python modules: pyds9.

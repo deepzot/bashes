@@ -3,11 +3,13 @@
 import os
 import os.path
 import argparse
+import math
 
 import numpy as np
 from astropy.io import fits
 import yaml
 
+import galsim
 import bashes
 
 def main():
@@ -68,7 +70,7 @@ def main():
         params = yaml.load(f)
         noiseVarTruth = params['noise']['variance']
 
-    # Load the per-galaxy source properties used to simulate this epoch.
+    # Load the per-galaxy true source properties used to simulate this epoch.
     truthCatalogPath = os.path.join(os.environ['GREAT3_ROOT'],'truth',args.branch,
         'epoch_catalog-%03d-%d.fits' % (args.field,args.epoch))
     hduList = fits.open(truthCatalogPath)
@@ -86,8 +88,22 @@ def main():
         display.show(firstStamp)
         # Display our reconstruction of the first data stamp.
         src = bashes.great3.createSource(truthCatalog[0])
-        srcStamp = bashes.render(src,args.pixel_scale,stampSize)
-        display.show(srcStamp)
+        #srcStamp = bashes.render(src,args.pixel_scale,stampSize)
+        #display.show(srcStamp)
+        transformed = src.shear(
+            g1=truthCatalog[0]['g1'],g2=truthCatalog[0]['g2']
+            ).shift(
+            dx=truthCatalog[0]['xshift']*args.pixel_scale,
+            dy=truthCatalog[0]['yshift']*args.pixel_scale)
+        convolved = galsim.Convolve(transformed,psf)
+        objStamp = bashes.render(convolved,args.pixel_scale,stampSize)
+        display.show(objStamp)
+        pulls = (firstStamp - objStamp.array)/math.sqrt(noiseVarTruth)
+        display.show(pulls)
+        import matplotlib.pyplot as plt
+        plt.hist(pulls.flat,bins=40)
+        plt.show()
+        print 'RMS pull =',np.std(pulls.flat)
 
     # Build the estimator for this analysis.
     estimator = bashes.Estimator(

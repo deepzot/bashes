@@ -66,7 +66,7 @@ class Display(object):
         if self.frames > 0:
             self.display.set('frame new')
         # display the numpy array
-        self.display.set_np2arr(image.astype(np.float32))
+        self.display.set_np2arr(image.astype(np.float32,copy=False))
         self.display.set('scale limits %s' % limits)
         # zoom to fit
         self.display.set('zoom to fit')
