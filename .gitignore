@@ -19,3 +19,7 @@
 *.exe
 *.out
 *.app
+
+# Byte-compiled / optimized / DLL files for python
+__pycache__/
+*.py[cod]
