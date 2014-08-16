@@ -1,3 +1,4 @@
+import inspect
 import numpy as np
 import galsim
 import bashes
@@ -9,8 +10,7 @@ class Estimator(object):
     def __init__(self,
         data,psfs,ivar,
         stampSize,pixelScale,
-        ntheta = 16, nxy = 7, xymax = 1.,
-        nshear = 5, gmax = 0.06,
+        ntheta,nxy,xymax,nshear,gmax,
         featureMatrix = None):
 
         self.stampSize = stampSize
@@ -77,6 +77,34 @@ class Estimator(object):
         # Initialize our (g1,g2) grid.
         self.nshear = nshear
         self.shearGrid = np.linspace(-gmax,+gmax,nshear)
+
+    @staticmethod
+    def addArgs(parser):
+        """
+        Add arguments to the provided command-line parser that support the fromArgs() method.
+        """
+        parser.add_argument('--ntheta', type = int, default = 16,
+            help = 'Number of theta values to use in interpolation grid')
+        parser.add_argument('--nxy', type = int, default = 7,
+            help = 'Number of x,y values to use in interpolation grid')
+        parser.add_argument('--xymax', type = float, default = 1.,
+            help = 'Range of x,y to use in interpolation grid (pixels)')
+        parser.add_argument('--nshear', type = int, default = 5,
+            help = 'Number of reduced shear values for sampling the likelihood')
+        parser.add_argument('--gmax', type = float, default = 0.06,
+            help = 'Range of reduced shear for sampling the likelihood')
+
+    @staticmethod
+    def fromArgs(args):
+        """
+        Returns a dictionary of constructor parameter values based on the parsed args provided.
+        """
+        # Look up the named Estimator constructor parameters.
+        pnames = (inspect.getargspec(Estimator.__init__)).args[1:]
+        # Get a dictionary of the arguments provided.
+        argsDict = vars(args)
+        # Return a dictionary of constructor parameters provided in args.
+        return { key:argsDict[key] for key in (set(pnames) & set(argsDict)) }
 
     def usePrior(self,sourceModel,fluxSigma,weight=1.):
         # Initialize float32 storage for the feature values we will calculate in parallel.

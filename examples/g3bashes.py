@@ -26,6 +26,7 @@ def main():
         help = 'Epoch number to analyze')
     parser.add_argument('--pixel-scale', type = float, default = 0.2,
         help = 'Pixel scale in arcsecs')
+    bashes.Estimator.addArgs(parser)
     args = parser.parse_args()
 
     # initialize the optional display
@@ -111,7 +112,7 @@ def main():
     psfModel = bashes.great3.createPSF(truthCatalog[0])
     estimator = bashes.Estimator(
         data=dataStamps[:stampSize,:stampSize],psfs=psfModel,ivar=1./noiseVarTruth,
-        stampSize=stampSize,pixelScale=args.pixel_scale)
+        stampSize=stampSize,pixelScale=args.pixel_scale,**bashes.Estimator.fromArgs(args))
 
     # Analyze stamps using the truth source prior for the first stamp.
     prior = bashes.great3.createSource(truthCatalog[0])
