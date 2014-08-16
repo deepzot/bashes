@@ -77,6 +77,7 @@ def main():
     truthCatalog = hduList[1].data
     hduList.close()
 
+    '''
     if display:
         # Display the PSF stamp.
         display.show(constPsf)
@@ -104,11 +105,18 @@ def main():
         plt.hist(pulls.flat,bins=40)
         plt.show()
         print 'RMS pull =',np.std(pulls.flat)
+    '''
 
-    # Build the estimator for this analysis.
+    # Build the estimator for this analysis (using only the first stamp, for now)
+    psfModel = bashes.great3.createPSF(truthCatalog[0])
     estimator = bashes.Estimator(
-        data=dataStamps,psfs=constPsf,ivar=1./noiseVarTruth,
-        stampSize=stampSize)
+        data=dataStamps[:stampSize,:stampSize],psfs=psfModel,ivar=1./noiseVarTruth,
+        stampSize=stampSize,pixelScale=args.pixel_scale)
+
+    # Analyze stamps using the truth source prior for the first stamp.
+    prior = bashes.great3.createSource(truthCatalog[0])
+    priorFlux = prior.getFlux()
+    estimator.usePrior(prior,fluxSigma = 0.1*priorFlux)
 
 if __name__ == '__main__':
     main()
