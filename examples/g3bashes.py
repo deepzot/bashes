@@ -46,6 +46,7 @@ def main():
 
     # Load the per-galaxy true source properties used to simulate this epoch.
     truthCatalog = obs.getTruthCatalog()
+    print truthCatalog.columns
 
     '''
     if display:

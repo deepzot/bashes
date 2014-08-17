@@ -7,17 +7,26 @@ import galsim
 
 class Observation(object):
     """
-    Represents a GREAT3 observation specified by a branch, field and epoch.
+    Represents a GREAT3 observation specified by a branch, index and epoch.
     """
-    def __init__(self,path,field,epoch):
+    def __init__(self,path,index,epoch):
         """
         Initializes a branch using a path of the form 'control/ground/constant'
         that should be present under $GREAT3_ROOT (and also under $GREAT3_ROOT/truth
         if truth info is required). Raises a RuntimeError if any problems are detected.
         """
+        # Lookup the GREAT3 filesystem root.
         if 'GREAT3_ROOT' not in os.environ:
             raise RuntimeError('$GREAT3_ROOT is not set.')
         g3root = os.environ['GREAT3_ROOT']
+        # Check for a valid branch path.
+        pathNames = path.split('/')
+        if (len(pathNames) != 3 or
+            pathNames[0] not in ('control','real_galaxy','variable_psf','multiepoch','full') or
+            pathNames[1] not in ('ground','space') or
+            pathNames[2] not in ('constant','variable')):
+            raise RuntimeError('Invalid branch path: %r' % path)
+        # Lookup the path to this observation's branch.
         self.branchPath = os.path.join(g3root,path)
         if not os.path.isdir(self.branchPath):
             raise RuntimeError('No such branch path: %r' % self.branchPath)
@@ -25,15 +34,36 @@ class Observation(object):
         self.truthPath = os.path.join(g3root,'truth',path)
         if not os.path.isdir(self.truthPath):
             self.truthPath = None
-        # Check the field and epoch parameters.
+        # Specify this branch's parameters.
+        if pathNames[0] in ('variable_psf','full') or pathNames[2] == 'variable':
+            self.nFields = 10
+            self.nSubfieldsPerField = 20
+        else:
+            self.nFields = 200
+            self.nSubfieldsPerField = 1
+        if pathNames[0] in ('multiepoch','full'):
+            self.nEpochs = 6
+        else:
+            self.nEpochs = 1
+        if pathNames[1] == 'space':
+            if self.nEpochs == 1:
+                self.pixelScale = 0.05
+                self.stampSize = 96
+            else:
+                self.pixelScale = 0.1
+                self.stampSize = 48
+        else:
+            self.pixelScale = 0.2
+            self.stampSize = 48
+        # Check the index and epoch parameters.
         try:
-            self.field = int(field)
-            assert self.field >= 0 and self.field < 200
+            self.index = int(index)
+            assert self.index >= 0 and self.index < 200
         except (ValueError,AssertionError):
-            raise RuntimeError('Invalid branch field index: %r' % field)
+            raise RuntimeError('Invalid branch index: %r' % index)
         try:
             self.epoch = int(epoch)
-            assert self.epoch >= 0
+            assert self.epoch >= 0 and self.epoch < self.nEpochs
         except (ValueError,AssertionError):
             raise RuntimeError('Invalid branch epoch index: %r' % epoch)
 
@@ -43,14 +73,13 @@ class Observation(object):
         our stampSize data member.
         """
         dataStampsPath = os.path.join(self.branchPath,'image-%03d-%d.fits' % (
-            self.field,self.epoch))
+            self.index,self.epoch))
         hduList = fits.open(dataStampsPath)
         dataStamps = hduList[0].data
         hduList.close()
-        # Infer the stamp size from the stamp array shape.
+        # Check for the expected image dimensions.
         assert dataStamps.shape[0] == dataStamps.shape[1], 'Image data is not square'
-        assert dataStamps.shape[0] % 100 == 0, 'Image data does not consist of 100x100 stamps'
-        self.stampSize = dataStamps.shape[0]//100
+        assert dataStamps.shape[0] == 100*self.stampSize, 'Image has unexpected dimensions'
         return dataStamps
 
     def getStars(self):
@@ -58,7 +87,7 @@ class Observation(object):
         Returns the array of postage stamp starfield data for this observation.
         """
         psfStampsPath = os.path.join(self.branchPath,'starfield_image-%03d-%d.fits' % (
-            self.field,self.epoch))
+            self.index,self.epoch))
         hduList = fits.open(psfStampsPath)
         psfStamps = hduList[0].data
         hduList.close()
@@ -71,7 +100,7 @@ class Observation(object):
         if not self.truthPath:
             raise RuntimeError('No truth available for observation')
         truthParamsPath = os.path.join(self.truthPath,'epoch_parameters-%03d-%d.yaml' % (
-            self.field,self.epoch))
+            self.index,self.epoch))
         with open(truthParamsPath,'r') as f:
             params = yaml.load(f)
         return params
@@ -83,7 +112,7 @@ class Observation(object):
         if not self.truthPath:
             raise RuntimeError('No truth available for observation')
         truthCatalogPath = os.path.join(self.truthPath,'epoch_catalog-%03d-%d.fits' % (
-            self.field,self.epoch))
+            self.index,self.epoch))
         hduList = fits.open(truthCatalogPath)
         truthCatalog = hduList[1].data
         hduList.close()
