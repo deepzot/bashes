@@ -151,23 +151,41 @@ class Observation(object):
         """
         Returns a GalSim model of the PSF for the specified galaxy index.
         """
-        params = self.getTruthCatalog()[galaxyIndex]
-        # Create the optical component.
-        opticalPSF = galsim.OpticalPSF(lam_over_diam = params['opt_psf_lam_over_diam'],
-            obscuration = params['opt_psf_obscuration'],
-            nstruts = params['opt_psf_n_struts'],
-            strut_angle = params['opt_psf_strut_angle'],
-            pad_factor = params['opt_psf_pad_factor'],
-            defocus = params['opt_psf_defocus'],
-            astig1 = params['opt_psf_astig1'],
-            astig2 = params['opt_psf_astig2'],
-            coma1 = params['opt_psf_coma1'],
-            coma2 = params['opt_psf_coma2'],
-            trefoil1 = params['opt_psf_trefoil1'],
-            trefoil2 = params['opt_psf_trefoil2'],
-            spher = params['opt_psf_spher'])
-        atmosphericPSF = galsim.Kolmogorov(fwhm = params['atmos_psf_fwhm'])
-        atmosphericPSF.applyShear(e = params['atmos_psf_e'],
-            beta = params['atmos_psf_beta']*galsim.degrees)
-        PSF = galsim.Convolve(opticalPSF,atmosphericPSF)
-        return PSF
+        catalog = self.getTruthCatalog()
+        keys = catalog.columns.names
+        params = catalog[galaxyIndex]
+        # Create an empty list of models that will be convolved for the final PSF.
+        models = [ ]
+        # Add jitter contribution if provided.
+        if 'opt_psf_jitter_sigma' in keys:
+            jitterPSF = galsim.Gaussian(sigma=params['opt_psf_jitter_sigma']).shear(
+                beta = params['opt_psf_jitter_beta']*galsim.degrees,
+                e = params['opt_psf_jitter_e'])
+            models.append(jitterPSF)
+        # Add charge diffusion contribution if provided.
+        if 'opt_psf_charge_sigma' in keys:
+            chargePSF = galsim.Gaussian(sigma=params['opt_psf_charge_sigma']).shear(
+                e1 = params['opt_psf_charge_e1'], e2 = 0.)
+            models.append(chargePSF)
+        # Create the optical component, which is always present.
+        kmap = { 'opt_psf_lam_over_diam':'lam_over_diam', 'opt_psf_obscuration':'obscuration',
+            'opt_psf_n_struts':'nstruts', 'opt_psf_strut_angle':'strut_angle',
+            'opt_psf_pad_factor':'pad_factor', 'opt_psf_defocus':'defocus',
+            'opt_psf_astig1':'astig1', 'opt_psf_astig2':'astig2', 'opt_psf_coma1':'coma1',
+            'opt_psf_coma2':'coma2', 'opt_psf_trefoil1':'trefoil1', 'opt_psf_trefoil2':'trefoil2',
+            'opt_psf_spher':'spher'}
+        opticalPSFParams = { kmap[key]:params[key] for key in kmap }
+        # Add units for the strut angle.
+        opticalPSFParams['strut_angle'] *= galsim.degrees
+        # Suppress warnings.
+        opticalPSFParams['suppress_warning'] = True
+        # Build the optical PSF from the params dictionary.
+        models.append(galsim.OpticalPSF(**opticalPSFParams))
+        # Add an atmospheric component if a FWHM value is provided.
+        if 'atmos_psf_fwhm' in keys:
+            atmosphericPSF = galsim.Kolmogorov(fwhm = params['atmos_psf_fwhm']).shear(
+                beta = params['atmos_psf_beta']*galsim.degrees,
+                e = params['atmos_psf_e'])
+            models.append(atmosphericPSF)
+        # Return the convolution of all PSF component models.
+        return galsim.Convolve(models)
