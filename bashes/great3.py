@@ -66,6 +66,9 @@ class Observation(object):
             assert self.epoch >= 0 and self.epoch < self.nEpochs
         except (ValueError,AssertionError):
             raise RuntimeError('Invalid branch epoch index: %r' % epoch)
+        # Our truth params and catalog are loaded on demand.
+        self.truthParams = None
+        self.truthCatalog = None
 
     def getImage(self):
         """
@@ -97,68 +100,74 @@ class Observation(object):
         """
         Returns a dictionary of truth parameter values for this observation.
         """
-        if not self.truthPath:
-            raise RuntimeError('No truth available for observation')
-        truthParamsPath = os.path.join(self.truthPath,'epoch_parameters-%03d-%d.yaml' % (
-            self.index,self.epoch))
-        with open(truthParamsPath,'r') as f:
-            params = yaml.load(f)
-        return params
+        if self.truthParams is None:
+            # No cached value available, so fetch it now.
+            if not self.truthPath:
+                raise RuntimeError('No truth available for observation')
+            truthParamsPath = os.path.join(self.truthPath,'epoch_parameters-%03d-%d.yaml' % (
+                self.index,self.epoch))
+            with open(truthParamsPath,'r') as f:
+                self.truthParams = yaml.load(f)
+        return self.truthParams
 
     def getTruthCatalog(self):
         """
         Returns the truth catalog for this observation.
-        """       
-        if not self.truthPath:
-            raise RuntimeError('No truth available for observation')
-        truthCatalogPath = os.path.join(self.truthPath,'epoch_catalog-%03d-%d.fits' % (
-            self.index,self.epoch))
-        hduList = fits.open(truthCatalogPath)
-        truthCatalog = hduList[1].data
-        hduList.close()
-        return truthCatalog
+        """
+        if self.truthCatalog is None:
+            # No cached value available, so fetch it now.           
+            if not self.truthPath:
+                raise RuntimeError('No truth available for observation')
+            truthCatalogPath = os.path.join(self.truthPath,'epoch_catalog-%03d-%d.fits' % (
+                self.index,self.epoch))
+            hduList = fits.open(truthCatalogPath)
+            self.truthCatalog = hduList[1].data
+            hduList.close()
+        return self.truthCatalog
 
-def createSource(params):
-    """
-    Returns a GalSim model of the unlensed source specified by params.
-    """
-    # Create the bulge component.
-    bulge = galsim.Sersic(flux = params['bulge_flux'],
-        half_light_radius = params['bulge_hlr'],
-        n = params['bulge_n'])
-    bulge.applyShear(q = params['bulge_q'],
-        beta = params['bulge_beta_radians']*galsim.radians)
-    # Is there a disk component?
-    if params['disk_flux'] > 0:
-        disk = galsim.Exponential(flux = params['disk_flux'],
-            half_light_radius = params['disk_hlr'])
-        disk.applyShear(q = params['disk_q'],
-            beta = params['disk_beta_radians']*galsim.radians)
-        source = galsim.Add(bulge,disk)
-    else:
-        source = bulge
-    return source
+    def createSource(self,galaxyIndex):
+        """
+        Returns a GalSim model of the unlensed source for the specified galaxy index.
+        """
+        params = self.getTruthCatalog()[galaxyIndex]
+        # Create the bulge component.
+        bulge = galsim.Sersic(flux = params['bulge_flux'],
+            half_light_radius = params['bulge_hlr'],
+            n = params['bulge_n'])
+        bulge.applyShear(q = params['bulge_q'],
+            beta = params['bulge_beta_radians']*galsim.radians)
+        # Is there a disk component?
+        if params['disk_flux'] > 0:
+            disk = galsim.Exponential(flux = params['disk_flux'],
+                half_light_radius = params['disk_hlr'])
+            disk.applyShear(q = params['disk_q'],
+                beta = params['disk_beta_radians']*galsim.radians)
+            source = galsim.Add(bulge,disk)
+        else:
+            source = bulge
+        return source
 
-def createPSF(params):
-    """
-    Returns a GalSim model of the optical + atmospheric PSF specified by params.
-    """
-    # Create the optical component.
-    opticalPSF = galsim.OpticalPSF(lam_over_diam = params['opt_psf_lam_over_diam'],
-        obscuration = params['opt_psf_obscuration'],
-        nstruts = params['opt_psf_n_struts'],
-        strut_angle = params['opt_psf_strut_angle'],
-        pad_factor = params['opt_psf_pad_factor'],
-        defocus = params['opt_psf_defocus'],
-        astig1 = params['opt_psf_astig1'],
-        astig2 = params['opt_psf_astig2'],
-        coma1 = params['opt_psf_coma1'],
-        coma2 = params['opt_psf_coma2'],
-        trefoil1 = params['opt_psf_trefoil1'],
-        trefoil2 = params['opt_psf_trefoil2'],
-        spher = params['opt_psf_spher'])
-    atmosphericPSF = galsim.Kolmogorov(fwhm = params['atmos_psf_fwhm'])
-    atmosphericPSF.applyShear(e = params['atmos_psf_e'],
-        beta = params['atmos_psf_beta']*galsim.degrees)
-    PSF = galsim.Convolve(opticalPSF,atmosphericPSF)
-    return PSF
+    def createPSF(self,galaxyIndex):
+        """
+        Returns a GalSim model of the PSF for the specified galaxy index.
+        """
+        params = self.getTruthCatalog()[galaxyIndex]
+        # Create the optical component.
+        opticalPSF = galsim.OpticalPSF(lam_over_diam = params['opt_psf_lam_over_diam'],
+            obscuration = params['opt_psf_obscuration'],
+            nstruts = params['opt_psf_n_struts'],
+            strut_angle = params['opt_psf_strut_angle'],
+            pad_factor = params['opt_psf_pad_factor'],
+            defocus = params['opt_psf_defocus'],
+            astig1 = params['opt_psf_astig1'],
+            astig2 = params['opt_psf_astig2'],
+            coma1 = params['opt_psf_coma1'],
+            coma2 = params['opt_psf_coma2'],
+            trefoil1 = params['opt_psf_trefoil1'],
+            trefoil2 = params['opt_psf_trefoil2'],
+            spher = params['opt_psf_spher'])
+        atmosphericPSF = galsim.Kolmogorov(fwhm = params['atmos_psf_fwhm'])
+        atmosphericPSF.applyShear(e = params['atmos_psf_e'],
+            beta = params['atmos_psf_beta']*galsim.degrees)
+        PSF = galsim.Convolve(opticalPSF,atmosphericPSF)
+        return PSF
