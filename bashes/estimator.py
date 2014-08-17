@@ -3,6 +3,8 @@ import numpy as np
 import galsim
 import bashes
 
+import scipy.special # for component-wise erf
+
 class Estimator(object):
     """
     Top-level class for performing a Bayesian shear estimation.
@@ -64,6 +66,10 @@ class Estimator(object):
             self.ivarIsConstant = True
         except ValueError:
             assert False,'Non-constant ivar not supported yet'
+
+        # Precompute and save Dt.Cinv.D for each stamp
+        D = self.data.reshape((self.ndata,self.nfeatures))
+        self.DtCinvD = self.ivar*np.einsum('ce,ce->c',D,D)
 
         # Initialize our coarse theta grid in degrees. We do not include the endpoint
         # because of the assumed periodicity.
@@ -136,15 +142,28 @@ class Estimator(object):
                             else:
                                 features = pixels.array.flat
                             M[ith,ig,idata,ixy] = features
-        # Calculate M.Cinv.M
-        MCinvM = self.ivar*np.einsum('abcde,abcde->abcd',M,M)
-        # Calculate D.Cinv.M
+        # Calculate Mt.Cinv.M
+        MtCinvM = self.ivar*np.einsum('abcde,abcde->abcd',M,M)
+        # Calculate Dt.Cinv.M
         D = self.data.reshape((self.ndata,self.nfeatures))
-        DCinvM = self.ivar*np.einsum('ce,abcde->abcd',D,M)
-        # Calculate chisq = ...
-        print M.shape
-        print D.shape
-        print MCinvM.shape
-        print DCinvM.shape
-        # Calculate phi = ...
-        # Calculate the flux-integrated likelihood
+        DtCinvM = self.ivar*np.einsum('ce,abcde->abcd',D,M)
+        # Calculate chisq = (Dt-Mt).Cinv.(D-M) = Dt.Cinv.D - 2*Dt.Cinv.M + Mt.Cinv.M
+        chiSq = self.DtCinvD - 2*DtCinvM + MtCinvM
+        print 'chiSq shape is',chiSq.shape
+        # Calculate gammaSq = 1 + r**2 MtCinvM
+        r = fluxSigma/sourceModel.getFlux()
+        rSq = r*r
+        gammaSq = 1 + rSq*MtCinvM
+        # Calculate phiSq = DtCinvD MtCinvM - DtCinvM**2
+        phiSq = self.DtCinvD*MtCinvM - DtCinvM**2
+        # Calculate the exponential arg psi
+        psi = (chiSq + rSq*phiSq)/(2*gammaSq)
+        # Calculate the normalization factor Gamma
+        root2r = np.sqrt(2*rSq)
+        gamma = np.sqrt(gammaSq)
+        erfArg1 = (1 + rSq*DtCinvM)/(root2r*gamma)
+        erfArg2 = 1./root2r
+        Gamma = (1 + scipy.special.erf(erfArg1))/(1 + scipy.special.erf(erfArg2))/gamma
+        # Calculate the negative log of the flux-integrated likelihood
+        nll = psi - np.log(Gamma)
+        print nll
