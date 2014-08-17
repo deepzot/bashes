@@ -117,7 +117,7 @@ def main():
     # Analyze stamps using the truth source prior for the first stamp.
     prior = bashes.great3.createSource(truthCatalog[0])
     priorFlux = prior.getFlux()
-    estimator.usePrior(prior,fluxSigma = 0.1*priorFlux)
+    estimator.usePrior(prior,fluxSigmaFraction = 0.1)
 
 if __name__ == '__main__':
     main()

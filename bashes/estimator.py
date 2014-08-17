@@ -112,7 +112,7 @@ class Estimator(object):
         # Return a dictionary of constructor parameters provided in args.
         return { key:argsDict[key] for key in (set(pnames) & set(argsDict)) }
 
-    def usePrior(self,sourceModel,fluxSigma,weight=1.):
+    def usePrior(self,sourceModel,fluxSigmaFraction,weight=1.):
         # Initialize float32 storage for the feature values we will calculate in parallel.
         assert self.ndata == 1,'ndata > 1 not supported yet'
         M = np.empty((self.ntheta,self.nshear**2,self.ndata,self.nxy**2,self.nfeatures),
@@ -151,8 +151,7 @@ class Estimator(object):
         chiSq = self.DtCinvD - 2*DtCinvM + MtCinvM
         print 'chiSq shape is',chiSq.shape
         # Calculate gammaSq = 1 + r**2 MtCinvM
-        r = fluxSigma/sourceModel.getFlux()
-        rSq = r*r
+        rSq = fluxSigmaFraction**2
         gammaSq = 1 + rSq*MtCinvM
         # Calculate phiSq = DtCinvD MtCinvM - DtCinvM**2
         phiSq = self.DtCinvD*MtCinvM - DtCinvM**2
