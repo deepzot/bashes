@@ -29,6 +29,8 @@ class Estimator(object):
             self.nfeatures = self.nPixels
 
         # Save the data as feature vectors for each stamp.
+        if isinstance(data,galsim.Image):
+            data = data.array
         assert len(data.shape) in (2,3), 'Expected 2D or 3D input data'
         if len(data.shape) == 2:
             assert data.shape[0] % stampSize == 0 and data.shape[1] % stampSize == 0, (

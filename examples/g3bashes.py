@@ -42,42 +42,21 @@ def main():
 
     # Load the true noise variance used to simulate this epoch.
     params = obs.getTruthParams()
+    print repr(params['noise'])
     noiseVarTruth = params['noise']['variance']
 
-    '''
     if display:
-        # Display the PSF stamp.
-        display.show(constPsf)
-        psf = bashes.great3.createPSF(truthCatalog[0])
-        psfStamp = bashes.render(psf,args.pixel_scale,obs.stampSize)
-        display.show(psfStamp)
-        # Display the first data stamp.
-        firstStamp = dataStamps[:obs.stampSize,:obs.stampSize]
-        display.show(firstStamp)
-        # Display our reconstruction of the first data stamp.
-        src = bashes.great3.createSource(truthCatalog[0])
-        #srcStamp = bashes.render(src,args.pixel_scale,obs.stampSize)
-        #display.show(srcStamp)
-        transformed = src.shear(
-            g1=truthCatalog[0]['g1'],g2=truthCatalog[0]['g2']
-            ).shift(
-            dx=truthCatalog[0]['xshift']*args.pixel_scale,
-            dy=truthCatalog[0]['yshift']*args.pixel_scale)
-        convolved = galsim.Convolve(transformed,psf)
-        objStamp = bashes.render(convolved,args.pixel_scale,obs.stampSize)
-        display.show(objStamp)
-        pulls = (firstStamp - objStamp.array)/math.sqrt(noiseVarTruth)
-        display.show(pulls)
-        import matplotlib.pyplot as plt
-        plt.hist(pulls.flat,bins=40)
-        plt.show()
-        print 'RMS pull =',np.std(pulls.flat)
-    '''
+        ix,iy = 25,75
+        # Display one data stamp.
+        display.show(dataStamps.getStamp(ix,iy))
+        # Display our reconstruction of the same data stamp.
+        display.show(obs.renderObject(100*iy+ix,addNoise=True))
+        return
 
     # Build the estimator for this analysis (using only the first stamp, for now)
     psfModel = obs.createPSF(0)
     estimator = bashes.Estimator(
-        data=dataStamps[:obs.stampSize,:obs.stampSize],psfs=psfModel,ivar=1./noiseVarTruth,
+        data=dataStamps.getStamp(0,0),psfs=psfModel,ivar=1./noiseVarTruth,
         stampSize=obs.stampSize,pixelScale=args.pixel_scale,**bashes.Estimator.fromArgs(args))
 
     # Analyze stamps using the truth source prior for the first stamp.
