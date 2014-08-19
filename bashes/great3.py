@@ -5,15 +5,19 @@ from astropy.io import fits
 import yaml
 import galsim
 
+from . import utility
+
 class Observation(object):
     """
-    Represents a GREAT3 observation specified by a branch, index and epoch.
+    Represents a GREAT3 observation specified by a branch, index (0-199) and epoch.
     """
     def __init__(self,path,index,epoch):
         """
         Initializes a branch using a path of the form 'control/ground/constant'
         that should be present under $GREAT3_ROOT (and also under $GREAT3_ROOT/truth
         if truth info is required). Raises a RuntimeError if any problems are detected.
+        After initialization, the following attributes are defined: nFields,
+        nSubfieldsPerField, nEpochs, pixelScale, stampSize.
         """
         # Lookup the GREAT3 filesystem root.
         if 'GREAT3_ROOT' not in os.environ:
@@ -189,3 +193,26 @@ class Observation(object):
             models.append(atmosphericPSF)
         # Return the convolution of all PSF component models.
         return galsim.Convolve(models)
+
+    def createObject(self,galaxyIndex):
+        """
+        Returns a GalSim model of the object corresponding to the specified galaxy index,
+        consisting of the source model with lensing distortion and centroid shift applied,
+        and convolved with the appropriate PSF.
+        """
+        # Look up the component models.
+        src = self.createSource(galaxyIndex)
+        psf = self.createPSF(galaxyIndex)
+        # Apply source transforms.
+        params = self.getTruthCatalog()[galaxyIndex]
+        transformed = src.shear(g1=params['g1'],g2=params['g2']).shift(
+            dx=params['xshift']*self.pixelScale,
+            dy=params['yshift']*self.pixelScale)
+        return galsim.Convolve(transformed,psf)
+
+    def renderObject(self,galaxyIndex):
+        """
+        Renders a noise free postage stamp for the specified galaxy index.
+        """
+        obj = self.createObject(galaxyIndex)
+        return utility.render(obj,self.pixelScale,self.stampSize)
