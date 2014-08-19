@@ -1,11 +1,12 @@
 import os
 import os.path
+import math
 import numpy as np
 from astropy.io import fits
 import yaml
 import galsim
 
-from . import utility
+from . import utility,tiled
 
 class Observation(object):
     """
@@ -87,7 +88,9 @@ class Observation(object):
         # Check for the expected image dimensions.
         assert dataStamps.shape[0] == dataStamps.shape[1], 'Image data is not square'
         assert dataStamps.shape[0] == 100*self.stampSize, 'Image has unexpected dimensions'
-        return dataStamps
+        img = tiled.Tiled(dataStamps,self.stampSize)
+        img.scale = self.pixelScale
+        return img
 
     def getStars(self):
         """
@@ -98,7 +101,9 @@ class Observation(object):
         hduList = fits.open(psfStampsPath)
         psfStamps = hduList[0].data
         hduList.close()
-        return psfStamps
+        img = tiled.Tiled(psfStamps,self.stampSize)
+        img.scale = self.pixelScale
+        return img
 
     def getTruthParams(self):
         """
@@ -210,9 +215,18 @@ class Observation(object):
             dy=params['yshift']*self.pixelScale)
         return galsim.Convolve(transformed,psf)
 
-    def renderObject(self,galaxyIndex):
+    def renderObject(self,galaxyIndex,addNoise=True):
         """
-        Renders a noise free postage stamp for the specified galaxy index.
+        Renders a postage stamp of the truth model for the specified galaxy index
+        with optional noise (that will match the noise used for GREAT3).
         """
         obj = self.createObject(galaxyIndex)
-        return utility.render(obj,self.pixelScale,self.stampSize)
+        stamp = utility.render(obj,self.pixelScale,size = self.stampSize)
+        if addNoise:
+            params = self.getTruthParams()
+            seed = params['noise_seed']
+            var = float(params['noise']['variance'])
+            rng = galsim.BaseDeviate(seed = seed + galaxyIndex)
+            noise = galsim.GaussianNoise(rng).withVariance(var)
+            stamp.addNoise(noise)
+        return stamp
