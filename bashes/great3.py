@@ -1,6 +1,6 @@
 import os
 import os.path
-import math
+import inspect
 import numpy as np
 from astropy.io import fits
 import yaml
@@ -12,31 +12,31 @@ class Observation(object):
     """
     Represents a GREAT3 observation specified by a branch, index (0-199) and epoch.
     """
-    def __init__(self,path,index,epoch):
+    def __init__(self,branch,index,epoch):
         """
-        Initializes a branch using a path of the form 'control/ground/constant'
+        Initializes an observation using a branch path of the form 'control/ground/constant'
         that should be present under $GREAT3_ROOT (and also under $GREAT3_ROOT/truth
-        if truth info is required). Raises a RuntimeError if any problems are detected.
-        After initialization, the following attributes are defined: nFields,
-        nSubfieldsPerField, nEpochs, pixelScale, stampSize.
+        if truth info is required), together with an image index (0-199) and an epoch number.
+        Raises a RuntimeError if any problems are detected. After initialization, the following
+        attributes are defined: nFields, nSubfieldsPerField, nEpochs, pixelScale, stampSize.
         """
         # Lookup the GREAT3 filesystem root.
         if 'GREAT3_ROOT' not in os.environ:
             raise RuntimeError('$GREAT3_ROOT is not set.')
         g3root = os.environ['GREAT3_ROOT']
         # Check for a valid branch path.
-        pathNames = path.split('/')
+        pathNames = branch.split('/')
         if (len(pathNames) != 3 or
             pathNames[0] not in ('control','real_galaxy','variable_psf','multiepoch','full') or
             pathNames[1] not in ('ground','space') or
             pathNames[2] not in ('constant','variable')):
-            raise RuntimeError('Invalid branch path: %r' % path)
+            raise RuntimeError('Invalid branch path: %r' % branch)
         # Lookup the path to this observation's branch.
-        self.branchPath = os.path.join(g3root,path)
+        self.branchPath = os.path.join(g3root,branch)
         if not os.path.isdir(self.branchPath):
             raise RuntimeError('No such branch path: %r' % self.branchPath)
         # Do we have truth info available?
-        self.truthPath = os.path.join(g3root,'truth',path)
+        self.truthPath = os.path.join(g3root,'truth',branch)
         if not os.path.isdir(self.truthPath):
             self.truthPath = None
         # Specify this branch's parameters.
@@ -74,6 +74,30 @@ class Observation(object):
         # Our truth params and catalog are loaded on demand.
         self.truthParams = None
         self.truthCatalog = None
+
+    @staticmethod
+    def addArgs(parser):
+        """
+        Add arguments to the provided command-line parser that support the fromArgs() method.
+        """
+        parser.add_argument('--branch', type = str, default = 'control/ground/constant',
+            help = 'Name of branch to use relative to $GREAT3_ROOT')
+        parser.add_argument('--index', type = int, default = 0,
+            help = 'Index of field to analyze (0-199)')
+        parser.add_argument('--epoch', type = int, default = 0,
+            help = 'Epoch number to analyze')
+
+    @staticmethod
+    def fromArgs(args):
+        """
+        Returns a dictionary of constructor parameter values based on the parsed args provided.
+        """
+        # Look up the named Estimator constructor parameters.
+        pnames = (inspect.getargspec(Observation.__init__)).args[1:]
+        # Get a dictionary of the arguments provided.
+        argsDict = vars(args)
+        # Return a dictionary of constructor parameters provided in args.
+        return { key:argsDict[key] for key in (set(pnames) & set(argsDict)) }
 
     def getImage(self):
         """

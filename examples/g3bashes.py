@@ -14,14 +14,7 @@ def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--ds9', action = 'store_true',
         help = 'display results in DS9')
-    parser.add_argument('--branch', type = str, default = 'control/ground/constant',
-        help = 'Name of branch to use relative to $GREAT3_ROOT')
-    parser.add_argument('--field', type = int, default = 0,
-        help = 'Index of field to analyze (0-199)')
-    parser.add_argument('--epoch', type = int, default = 0,
-        help = 'Epoch number to analyze')
-    parser.add_argument('--pixel-scale', type = float, default = 0.2,
-        help = 'Pixel scale in arcsecs')
+    bashes.great3.Observation.addArgs(parser)
     bashes.Estimator.addArgs(parser)
     args = parser.parse_args()
 
@@ -32,7 +25,7 @@ def main():
         display = None
 
     # Initialize the GREAT3 observation we will analyze.
-    obs = bashes.great3.Observation(args.branch,args.field,args.epoch)
+    obs = bashes.great3.Observation(**bashes.great3.Observation.fromArgs(args))
 
     # Load the postage stamps to analyze.
     dataStamps = obs.getImage()
@@ -42,12 +35,11 @@ def main():
 
     # Load the true noise variance used to simulate this epoch.
     params = obs.getTruthParams()
-    print repr(params['noise'])
     noiseVarTruth = params['noise']['variance']
 
     if display:
-        ix,iy = 25,75
         # Display one data stamp.
+        ix,iy = 25,75
         display.show(dataStamps.getStamp(ix,iy))
         # Display our reconstruction of the same data stamp.
         display.show(obs.renderObject(100*iy+ix,addNoise=True))
@@ -57,7 +49,7 @@ def main():
     psfModel = obs.createPSF(0)
     estimator = bashes.Estimator(
         data=dataStamps.getStamp(0,0),psfs=psfModel,ivar=1./noiseVarTruth,
-        stampSize=obs.stampSize,pixelScale=args.pixel_scale,**bashes.Estimator.fromArgs(args))
+        stampSize=obs.stampSize,pixelScale=obs.pixelScale,**bashes.Estimator.fromArgs(args))
 
     # Analyze stamps using the truth source prior for the first stamp.
     prior = obs.createSource(0)

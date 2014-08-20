@@ -151,7 +151,6 @@ class Estimator(object):
         DtCinvM = self.ivar*np.einsum('ce,abcde->abcd',D,M)
         # Calculate chisq = (Dt-Mt).Cinv.(D-M) = Dt.Cinv.D - 2*Dt.Cinv.M + Mt.Cinv.M
         chiSq = self.DtCinvD - 2*DtCinvM + MtCinvM
-        print 'chiSq shape is',chiSq.shape
         # Calculate gammaSq = 1 + r**2 MtCinvM
         rSq = fluxSigmaFraction**2
         gammaSq = 1 + rSq*MtCinvM
