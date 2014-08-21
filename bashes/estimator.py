@@ -12,7 +12,8 @@ class Estimator(object):
     def __init__(self,
         data,psfs,ivar,
         stampSize,pixelScale,
-        ntheta,nxy,xymax,nshear,gmax,
+        ntheta,nxy,xymax,
+        nshear,gmax,g1_center,g2_center,
         featureMatrix = None):
 
         self.stampSize = stampSize
@@ -84,7 +85,8 @@ class Estimator(object):
 
         # Initialize our (g1,g2) grid.
         self.nshear = nshear
-        self.shearGrid = np.linspace(-gmax,+gmax,nshear)
+        dg = np.linspace(-gmax,+gmax,nshear)
+        self.g1,self.g2 = np.meshgrid(g1_center+dg,g2_center+dg)
 
     @staticmethod
     def addArgs(parser):
@@ -101,6 +103,10 @@ class Estimator(object):
             help = 'Number of reduced shear values for sampling the likelihood')
         parser.add_argument('--gmax', type = float, default = 0.06,
             help = 'Range of reduced shear for sampling the likelihood')
+        parser.add_argument('--g1-center', type = float, default = 0.,
+            help = 'g1 value at center of shear grid')
+        parser.add_argument('--g2-center', type = float, default = 0.,
+            help = 'g2 value at center of shear grid')
 
     @staticmethod
     def fromArgs(args):
@@ -123,27 +129,25 @@ class Estimator(object):
         # Loop over rotations.
         for ith,theta in enumerate(self.thetaGrid):
             # Loop over shears.
-            for ig1,g1 in enumerate(self.shearGrid):
-                for ig2,g2 in enumerate(self.shearGrid):
-                    ig = ig1*self.nshear + ig2
-                    print (ith,ig)
-                    # Apply rotation and shear transforms.
-                    transformed = sourceModel.rotate(theta*galsim.degrees).shear(g1=g1,g2=g2)
-                    # Loop over PSF models (assuming we have a single PSF model for now)
-                    idata = 0
-                    convolved = galsim.Convolve(transformed,self.psfs)
-                    # Loop over x,y shifts.
-                    for ix,dx in enumerate(self.xyGrid):
-                        for iy,dy in enumerate(self.xyGrid):
-                            ixy = ix*self.nxy + iy
-                            model = convolved.shift(dx=dx*self.pixelScale,dy=dy*self.pixelScale)
-                            # Render the fully-specified model.
-                            pixels = bashes.render(model,scale=self.pixelScale,size=self.stampSize)
-                            if self.featureMatrix:
-                                features = self.featureMatrix.dot(pixels.array.flat)
-                            else:
-                                features = pixels.array.flat
-                            M[ith,ig,idata,ixy] = features
+            for ig,(g1,g2) in enumerate(zip(self.g1.flat,self.g2.flat)):
+                print (ith,ig)
+                # Apply rotation and shear transforms.
+                transformed = sourceModel.rotate(theta*galsim.degrees).shear(g1=g1,g2=g2)
+                # Loop over PSF models (assuming we have a single PSF model for now)
+                idata = 0
+                convolved = galsim.Convolve(transformed,self.psfs)
+                # Loop over x,y shifts.
+                for ix,dx in enumerate(self.xyGrid):
+                    for iy,dy in enumerate(self.xyGrid):
+                        ixy = ix*self.nxy + iy
+                        model = convolved.shift(dx=dx*self.pixelScale,dy=dy*self.pixelScale)
+                        # Render the fully-specified model.
+                        pixels = bashes.render(model,scale=self.pixelScale,size=self.stampSize)
+                        if self.featureMatrix:
+                            features = self.featureMatrix.dot(pixels.array.flat)
+                        else:
+                            features = pixels.array.flat
+                        M[ith,ig,idata,ixy] = features
         # Calculate Mt.Cinv.M
         MtCinvM = self.ivar*np.einsum('abcde,abcde->abcd',M,M)
         # Calculate Dt.Cinv.M
