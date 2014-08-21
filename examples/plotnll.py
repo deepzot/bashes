@@ -23,6 +23,8 @@ def main():
     bashes.great3.Observation.addArgs(parser)
     parser.add_argument('--stamp', type = int, default = 0,
         help = 'Index of galaxy to analyze (0-9999')
+    parser.add_argument('--rotate', type = float, default = 90.,
+        help = 'Rotation to apply to prior relative to true source (deg)')
     bashes.Estimator.addArgs(parser)
     args = parser.parse_args()
 
@@ -49,6 +51,7 @@ def main():
 
     # Lookup the catalog truth for this stamp.
     truth = obs.getTruthCatalog()[args.stamp]
+    print 'Galaxy SNR =',truth['gal_sn']
 
     # Center the estimator shear grid on the true shear. Note that this
     # effectively ignores any g1,g2_center values given on the command line.
@@ -63,12 +66,12 @@ def main():
 
     # Analyze stamps using the truth source prior for the first stamp.
     # Create an unlensed source prior for this stamp using truth info.
-    prior = obs.createSource(args.stamp)
+    prior = obs.createSource(args.stamp).rotate(args.rotate*galsim.degrees)
     estimator.usePrior(prior,fluxSigmaFraction = 0.1)
 
     # Find the global minimum NLL wrt (x,y,theta) for the true shear.
     ig,idata = 0,0
-    nllMin = np.min(estimator.nll[:,ig,idata,:])
+    nllMin = np.min(estimator.nllXYTheta[:,ig,idata,:])
 
     # Initialize matplotlib.
     fig1 = plt.figure('fig1',figsize=(12,9))
@@ -88,7 +91,7 @@ def main():
     for ith in range(args.ntheta):
         # Plot NLL(x,y,theta) vs (x,y) at this theta.
         plt.subplot(nrow,ncol,ith+1)
-        nll = estimator.nll[ith,ig,idata].reshape((args.nxy,args.nxy))
+        nll = estimator.nllXYTheta[ith,ig,idata].reshape((args.nxy,args.nxy))
         plt.pcolormesh(xyEdges,xyEdges,nll,cmap='rainbow',rasterized=True)
         # Superimpose contours relative to the global minimum in (x,y,theta).
         plt.contour(xy,xy,nll,levels=nllContours,colors='w',linestyles='-')
@@ -98,6 +101,14 @@ def main():
         axes = plt.gca()
         axes.xaxis.set_ticklabels([])
         axes.yaxis.set_ticklabels([])
+        # Plot NLL(theta) and exp(-NLL(theta)) after (x,y) marginalization.
+        ax1 = plt.subplot(nrow,1,nrow)
+        nllTheta = estimator.nllTheta[:,ig,idata]
+        nllThetaMin = np.min(nllTheta)
+        ax1.plot(estimator.thetaGrid,nllTheta - nllThetaMin,'--')
+        ax2 = ax1.twinx()
+        ax2.yaxis.set_ticklabels([])
+        ax2.plot(estimator.thetaGrid,np.exp(-(nllTheta - nllThetaMin)),'-')
     plt.show()
 
 if __name__ == '__main__':

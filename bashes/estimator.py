@@ -1,5 +1,6 @@
 import inspect
 import numpy as np
+import scipy.interpolate
 import galsim
 import bashes
 
@@ -13,6 +14,7 @@ class Estimator(object):
         data,psfs,ivar,
         stampSize,pixelScale,
         ntheta,nxy,xymax,
+        xy_oversampling,
         nshear,gmax,g1_center,g2_center,
         featureMatrix = None):
 
@@ -79,14 +81,28 @@ class Estimator(object):
         self.ntheta = ntheta
         self.thetaGrid = np.linspace(0.,180.,ntheta,endpoint=False)
 
-        # Initialize our x,y grid in pixels.
+        # Initialize our x,y grid in pixel units.
         self.nxy = nxy
         self.xyGrid = np.linspace(-xymax,+xymax,nxy)
+
+        # Initialize our oversampled x,y grid in pixel units.
+        nxyFine = (nxy-1)*xy_oversampling
+        dxyFine = 2*xymax/nxyFine
+        self.xyFine = np.linspace(-xymax + 0.5*dxyFine,+xymax - 0.5*dxyFine,nxyFine)
 
         # Initialize our (g1,g2) grid.
         self.nshear = nshear
         dg = np.linspace(-gmax,+gmax,nshear)
         self.g1,self.g2 = np.meshgrid(g1_center+dg,g2_center+dg)
+
+        # Initialize float32 storage for the feature values we will calculate in parallel.
+        assert self.ndata == 1,'ndata > 1 not supported yet'
+        self.M = np.empty((self.ntheta,self.nshear**2,self.ndata,self.nxy**2,self.nfeatures),
+            dtype=np.float32)
+        # Initialize storage for marginalized NLL arrays.
+        self.nllTheta = np.empty((self.ntheta,self.nshear,self.ndata))
+        print 'allocated %ld (M) + %ld (nllTheta) bytes' % (
+            self.M.nbytes,self.nllTheta.nbytes)
 
     @staticmethod
     def addArgs(parser):
@@ -99,6 +115,8 @@ class Estimator(object):
             help = 'Number of x,y values to use in interpolation grid')
         parser.add_argument('--xymax', type = float, default = 1.,
             help = 'Range of x,y to use in interpolation grid (pixels)')
+        parser.add_argument('--xy-oversampling', type = int, default = 6,
+            help = 'Amount of interpolated oversampling to use in x,y (1 = none)')
         parser.add_argument('--nshear', type = int, default = 5,
             help = 'Number of reduced shear values for sampling the likelihood')
         parser.add_argument('--gmax', type = float, default = 0.06,
@@ -121,11 +139,6 @@ class Estimator(object):
         return { key:argsDict[key] for key in (set(pnames) & set(argsDict)) }
 
     def usePrior(self,sourceModel,fluxSigmaFraction,weight=1.):
-        # Initialize float32 storage for the feature values we will calculate in parallel.
-        assert self.ndata == 1,'ndata > 1 not supported yet'
-        M = np.empty((self.ntheta,self.nshear**2,self.ndata,self.nxy**2,self.nfeatures),
-            dtype=np.float32)
-        print 'allocated %ld bytes for M' % M.nbytes
         # Loop over rotations.
         for ith,theta in enumerate(self.thetaGrid):
             # Loop over shears.
@@ -147,12 +160,12 @@ class Estimator(object):
                             features = self.featureMatrix.dot(pixels.array.flat)
                         else:
                             features = pixels.array.flat
-                        M[ith,ig,idata,ixy] = features
+                        self.M[ith,ig,idata,ixy] = features
         # Calculate Mt.Cinv.M
-        MtCinvM = self.ivar*np.einsum('abcde,abcde->abcd',M,M)
+        MtCinvM = self.ivar*np.einsum('abcde,abcde->abcd',self.M,self.M)
         # Calculate Dt.Cinv.M
         D = self.data.reshape((self.ndata,self.nfeatures))
-        DtCinvM = self.ivar*np.einsum('ce,abcde->abcd',D,M)
+        DtCinvM = self.ivar*np.einsum('ce,abcde->abcd',D,self.M)
         # Calculate chisq = (Dt-Mt).Cinv.(D-M) = Dt.Cinv.D - 2*Dt.Cinv.M + Mt.Cinv.M
         chiSq = self.DtCinvD - 2*DtCinvM + MtCinvM
         # Calculate gammaSq = 1 + r**2 MtCinvM
@@ -169,4 +182,19 @@ class Estimator(object):
         erfArg2 = 1./root2r
         Gamma = (1 + scipy.special.erf(erfArg1))/(1 + scipy.special.erf(erfArg2))/gamma
         # Calculate the negative log of the flux-integrated likelihood
-        self.nll = psi - np.log(Gamma)
+        self.nllXYTheta = psi - np.log(Gamma)
+        # Loop over shears and data stamps to perform marginalization integrals.
+        for ig in range(len(self.g1)):
+            for idata in range(self.ndata):
+                # Marginalize nll(x,y,theta) over (x,y) for each theta.
+                for ith in range(self.ntheta):
+                    # Calculate a quadratic 2D spline of the tabulated nll(x,y,theta) at this theta.
+                    nllXY = self.nllXYTheta[ith,ig,idata].reshape((self.nxy,self.nxy))
+                    spline = scipy.interpolate.RectBivariateSpline(
+                        self.xyGrid,self.xyGrid,nllXY,kx=2,ky=2,s=0.)
+                    # Evaluate the spline on our oversampled fine grid.
+                    nllFine = spline(self.xyFine,self.xyFine)
+                    # Estimate -log of the integral over x,y.
+                    nllMin = np.min(nllFine)
+                    expSum = np.sum(np.exp(nllMin - nllFine))
+                    self.nllTheta[ith,ig,idata] = nllMin - np.log(expSum/np.size(nllFine))
