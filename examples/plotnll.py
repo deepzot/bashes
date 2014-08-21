@@ -2,13 +2,10 @@
 
 # Creates plots to illustrate the marginalization algorithm.
 
-import os
-import os.path
 import argparse
 
 import numpy as np
-from astropy.io import fits
-import yaml
+import scipy.stats
 
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
@@ -25,6 +22,10 @@ def main():
         help = 'Index of galaxy to analyze (0-9999')
     parser.add_argument('--rotate', type = float, default = 90.,
         help = 'Rotation to apply to prior relative to true source (deg)')
+    parser.add_argument('--dg1', type = float, default = 0.,
+        help = 'Amount to offset g1 component of estimator shear from true value')
+    parser.add_argument('--dg2', type = float, default = 0.,
+        help = 'Amount to offset g2 component of estimator shear from true value')
     bashes.Estimator.addArgs(parser)
     args = parser.parse_args()
 
@@ -53,11 +54,10 @@ def main():
     truth = obs.getTruthCatalog()[args.stamp]
     print 'Galaxy SNR =',truth['gal_sn']
 
-    # Center the estimator shear grid on the true shear. Note that this
-    # effectively ignores any g1,g2_center values given on the command line.
-    # TODO: rework Estimator.addArgs to optionally exclude some args.
-    args.g1_center = truth['g1']
-    args.g2_center = truth['g2']
+    # Estimator uses a single shear value given by the true shear plus some offset.
+    args.nshear = 1
+    args.g1_center = truth['g1'] + args.dg1
+    args.g2_center = truth['g2'] + args.dg2
 
     # Build the estimator for this analysis (using only the first stamp, for now)
     estimator = bashes.Estimator(
@@ -74,19 +74,21 @@ def main():
     nllMin = np.min(estimator.nllXYTheta[:,ig,idata,:])
 
     # Initialize matplotlib.
-    fig1 = plt.figure('fig1',figsize=(12,9))
+    fig = plt.figure('fig1',figsize=(12,9))
+    fig.set_facecolor('white')
+    plt.subplots_adjust(left=0.05,bottom=0.06,right=0.98,top=0.98,wspace=0.1,hspace=0.1)
     ncol = 5
     nrow = 1+(args.ntheta+ncol-1)//ncol
     xy = estimator.xyFine
     dxy = xy[1] - xy[0]
     xyEdges = np.linspace(xy[0]-dxy/2,xy[-1]+dxy/2,len(xy)+1)
-    xyEdges[0] = xy[0]
-    xyEdges[-1] = xy[-1]
+    coarseGrid = estimator.xyGrid[1:-1]
     # Lookup the true centroid shift.
     dx = truth['xshift']
     dy = truth['yshift']
     # Initialize contour levels relative to the global minimum NLL.
-    nllContours = np.arange(1,11) + nllMin
+    nllProb = np.array((0.6827,0.9543,0.9973))
+    nllDeltaChi2 = scipy.stats.chi2.isf(1-nllProb,df=3)
     # Loop over theta values.
     for ith in range(args.ntheta):
         # Plot NLL(x,y,theta) vs (x,y) at this theta.
@@ -94,21 +96,36 @@ def main():
         nll = estimator.getNllXYFine(ith,ig,idata)
         plt.pcolormesh(xyEdges,xyEdges,nll,cmap='rainbow',rasterized=True)
         # Superimpose contours relative to the global minimum in (x,y,theta).
-        plt.contour(xy,xy,nll,levels=nllContours,colors='w',linestyles='-')
-        # Draw a marker at the true centroid position.
-        plt.plot(dx,dy,marker='x',color='w')
+        plt.contour(xy,xy,nll,levels=nllMin+nllDeltaChi2,
+            colors='w',linestyles=('-','--',':'))
         # Remove tick labels.
         axes = plt.gca()
         axes.xaxis.set_ticklabels([])
         axes.yaxis.set_ticklabels([])
-        # Plot NLL(theta) and exp(-NLL(theta)) after (x,y) marginalization.
+        # Draw tick marks to show the coarse grid.
+        axes.set_xticks(coarseGrid)
+        axes.set_yticks(coarseGrid)
+        # Draw a marker at the true (x,y) centroid location.
+        plt.plot(dx,dy,'r*',markersize=15)
+        # Plot NLL(theta) after (x,y) marginalization.
         ax1 = plt.subplot(nrow,1,nrow)
         nllTheta = estimator.getNllFine(ig,idata)
         nllThetaMin = np.min(nllTheta)
-        ax1.plot(estimator.thetaFine,nllTheta - nllThetaMin,'--')
+        dnllTheta = nllTheta - nllThetaMin
+        ax1.plot(estimator.thetaFine,dnllTheta,'b--')
+        ax1.plot(estimator.thetaGrid,
+            estimator.nllTheta[:,ig,idata]-nllThetaMin,'k.',markersize=10)
+        yrange = np.max(dnllTheta)
+        plt.ylim((-0.05*yrange,1.05*yrange))
+        plt.xlabel('Source rotation (deg)')
+        plt.ylabel('NLL - min(NLL)')
+        # Superimpose the likelihood exp(-NLL(theta)).
         ax2 = ax1.twinx()
         ax2.yaxis.set_ticklabels([])
-        ax2.plot(estimator.thetaFine,np.exp(-(nllTheta - nllThetaMin)),'-')
+        ax2.plot(estimator.thetaFine,np.exp(-dnllTheta),'b-')
+        # Draw a marker at the true value.
+        plt.ylim((0.,1.05))
+        ax2.plot(args.rotate,0.15,'r*',markersize=15)
     plt.show()
 
 if __name__ == '__main__':
