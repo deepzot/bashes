@@ -14,7 +14,7 @@ class Estimator(object):
         data,psfs,ivar,
         stampSize,pixelScale,
         ntheta,nxy,xymax,
-        xy_oversampling,
+        xy_oversampling,theta_oversampling,
         nshear,gmax,g1_center,g2_center,
         featureMatrix = None):
 
@@ -81,6 +81,13 @@ class Estimator(object):
         self.ntheta = ntheta
         self.thetaGrid = np.linspace(0.,180.,ntheta,endpoint=False)
 
+        # Initialize a corresponding grid suitable for periodic interpolation.
+        self.thetaOrder = 3
+        self.thetaPeriodic = bashes.utility.padPeriodic(self.thetaGrid,self.thetaOrder,180.)
+
+        # Initialize our oversampled theta grid in degrees.
+        self.thetaFine = np.linspace(0.,180.,ntheta*theta_oversampling,endpoint=False)
+
         # Initialize our x,y grid in pixel units.
         self.nxy = nxy
         self.xyGrid = np.linspace(-xymax,+xymax,nxy)
@@ -101,6 +108,7 @@ class Estimator(object):
             dtype=np.float32)
         # Initialize storage for marginalized NLL arrays.
         self.nllTheta = np.empty((self.ntheta,self.nshear,self.ndata))
+        self.nll = np.empty((self.nshear,self.ndata))
         print 'allocated %ld (M) + %ld (nllTheta) bytes' % (
             self.M.nbytes,self.nllTheta.nbytes)
 
@@ -117,6 +125,8 @@ class Estimator(object):
             help = 'Range of x,y to use in interpolation grid (pixels)')
         parser.add_argument('--xy-oversampling', type = int, default = 6,
             help = 'Amount of interpolated oversampling to use in x,y (1 = none)')
+        parser.add_argument('--theta-oversampling', type = int, default = 32,
+            help = 'Amount of interpolated oversampling to use in theta (1 = none)')
         parser.add_argument('--nshear', type = int, default = 5,
             help = 'Number of reduced shear values for sampling the likelihood')
         parser.add_argument('--gmax', type = float, default = 0.06,
@@ -188,13 +198,45 @@ class Estimator(object):
             for idata in range(self.ndata):
                 # Marginalize nll(x,y,theta) over (x,y) for each theta.
                 for ith in range(self.ntheta):
-                    # Calculate a quadratic 2D spline of the tabulated nll(x,y,theta) at this theta.
-                    nllXY = self.nllXYTheta[ith,ig,idata].reshape((self.nxy,self.nxy))
-                    spline = scipy.interpolate.RectBivariateSpline(
-                        self.xyGrid,self.xyGrid,nllXY,kx=2,ky=2,s=0.)
-                    # Evaluate the spline on our oversampled fine grid.
-                    nllFine = spline(self.xyFine,self.xyFine)
+                    # Tabulate nll(x,y) on the oversampled grid.
+                    nllFine = self.getNllXYFine(ith,ig,idata)
                     # Estimate -log of the integral over x,y.
-                    nllMin = np.min(nllFine)
-                    expSum = np.sum(np.exp(nllMin - nllFine))
-                    self.nllTheta[ith,ig,idata] = nllMin - np.log(expSum/np.size(nllFine))
+                    self.nllTheta[ith,ig,idata] = Estimator.marginalize(nllFine)
+                # Tabulate nll(theta) using a periodic spline interpolation.
+                nllFine = self.getNllFine(ig,idata)
+                # Estimate -log of the integral over theta.
+                self.nll[ig,idata] = Estimator.marginalize(nllFine)
+
+    @staticmethod
+    def marginalize(nllFine):
+        """
+        Returns an estimate of the -log of the integral of exp(-nll) using the provided
+        values of nll tabulated on a uniform grid over the integration domain.
+        """
+        nllMin = np.min(nllFine)
+        expSum = np.sum(np.exp(nllMin - nllFine))
+        return nllMin - np.log(expSum/np.size(nllFine))
+
+    def getNllXYFine(self,ith,ig,idata):
+        """
+        Returns an (x,y) array of NLL values marginalized over flux for the specified
+        theta, shear, and data stamp index. Values are interpolated onto the fine
+        oversampled grid self.xyFine used for (x,y) marginalization.
+        """
+        # Calculate a quadratic 2D spline of the tabulated nll(x,y,theta) at this theta.
+        nllXY = self.nllXYTheta[ith,ig,idata].reshape((self.nxy,self.nxy))
+        spline = scipy.interpolate.RectBivariateSpline(
+            self.xyGrid,self.xyGrid,nllXY,kx=2,ky=2,s=0.)
+        # Evaluate and return the spline on our oversampled fine grid.
+        return spline(self.xyFine,self.xyFine)
+
+    def getNllFine(self,ig,idata):
+        """
+        Returns a (theta) array of NLL values marginalized over flux,x,y for the
+        specified shear and data stamp index. Values are interpolated onto the fine
+        oversampled grid self.thetaFine used for (theta) marginalization.
+        """
+        nllPeriodic = bashes.utility.padPeriodic(self.nllTheta[:,ig,idata],self.thetaOrder)
+        spline = scipy.interpolate.interp1d(self.thetaPeriodic,nllPeriodic,
+            kind=self.thetaOrder,copy=False)
+        return spline(self.thetaFine)

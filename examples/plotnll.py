@@ -77,7 +77,7 @@ def main():
     fig1 = plt.figure('fig1',figsize=(12,9))
     ncol = 5
     nrow = 1+(args.ntheta+ncol-1)//ncol
-    xy = estimator.xyGrid
+    xy = estimator.xyFine
     dxy = xy[1] - xy[0]
     xyEdges = np.linspace(xy[0]-dxy/2,xy[-1]+dxy/2,len(xy)+1)
     xyEdges[0] = xy[0]
@@ -91,7 +91,7 @@ def main():
     for ith in range(args.ntheta):
         # Plot NLL(x,y,theta) vs (x,y) at this theta.
         plt.subplot(nrow,ncol,ith+1)
-        nll = estimator.nllXYTheta[ith,ig,idata].reshape((args.nxy,args.nxy))
+        nll = estimator.getNllXYFine(ith,ig,idata)
         plt.pcolormesh(xyEdges,xyEdges,nll,cmap='rainbow',rasterized=True)
         # Superimpose contours relative to the global minimum in (x,y,theta).
         plt.contour(xy,xy,nll,levels=nllContours,colors='w',linestyles='-')
@@ -103,12 +103,12 @@ def main():
         axes.yaxis.set_ticklabels([])
         # Plot NLL(theta) and exp(-NLL(theta)) after (x,y) marginalization.
         ax1 = plt.subplot(nrow,1,nrow)
-        nllTheta = estimator.nllTheta[:,ig,idata]
+        nllTheta = estimator.getNllFine(ig,idata)
         nllThetaMin = np.min(nllTheta)
-        ax1.plot(estimator.thetaGrid,nllTheta - nllThetaMin,'--')
+        ax1.plot(estimator.thetaFine,nllTheta - nllThetaMin,'--')
         ax2 = ax1.twinx()
         ax2.yaxis.set_ticklabels([])
-        ax2.plot(estimator.thetaGrid,np.exp(-(nllTheta - nllThetaMin)),'-')
+        ax2.plot(estimator.thetaFine,np.exp(-(nllTheta - nllThetaMin)),'-')
     plt.show()
 
 if __name__ == '__main__':
