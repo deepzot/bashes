@@ -18,8 +18,10 @@ def main():
     # Parse command-line args.
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     bashes.great3.Observation.addArgs(parser)
-    parser.add_argument('--stamp', type = int, default = 0,
-        help = 'Index of galaxy to analyze (0-9999')
+    parser.add_argument('--data-index', type = int, default = 0,
+        help = 'Index of data stamp to analyze (0-9999')
+    parser.add_argument('--prior-index', type = int, default = None,
+        help = 'Index of prior to assume (0-9999, default is to use data index)')
     parser.add_argument('--rotate', type = float, default = 90.,
         help = 'Rotation to apply to prior relative to true source (deg)')
     parser.add_argument('--dg1', type = float, default = 0.,
@@ -29,9 +31,12 @@ def main():
     bashes.Estimator.addArgs(parser)
     args = parser.parse_args()
 
-    # Check stamp arg.
-    if args.stamp < 0 or args.stamp >= 10000:
-        print 'stamp %d is outside of valid range 0-10000' % args.stamp
+    # Check stamp index args.
+    if args.data_index < 0 or args.data_index >= 10000:
+        print 'data index %d is outside of valid range 0-10000' % args.data_index
+        return -1
+    if args.prior_index is not None and (args.prior_index < 0 or args.prior_index >= 10000):
+        print 'prior index %d is outside of valid range 0-10000' % args.prior_index
         return -1
 
     # Initialize the GREAT3 observation we will analyze.
@@ -39,19 +44,19 @@ def main():
 
     # Load the one simulated postage stamp we will use to generate plots.
     dataStamps = obs.getImage()
-    iy = args.stamp//dataStamps.ny
-    ix = args.stamp%dataStamps.ny
+    iy = args.data_index//dataStamps.ny
+    ix = args.data_index%dataStamps.ny
     stamp = dataStamps.getStamp(ix,iy)
 
     # Create the PSF model for this stamp using truth info.
-    psfModel = obs.createPSF(args.stamp)
+    psfModel = obs.createPSF(args.data_index)
 
     # Load the true noise variance used to simulate this epoch.
     params = obs.getTruthParams()
     noiseVarTruth = params['noise']['variance']
 
     # Lookup the catalog truth for this stamp.
-    truth = obs.getTruthCatalog()[args.stamp]
+    truth = obs.getTruthCatalog()[args.data_index]
     print 'Galaxy SNR =',truth['gal_sn']
 
     # Estimator uses a single shear value given by the true shear plus some offset.
@@ -64,10 +69,13 @@ def main():
         data=stamp,psfs=psfModel,ivar=1./noiseVarTruth,
         stampSize=obs.stampSize,pixelScale=obs.pixelScale,**bashes.Estimator.fromArgs(args))
 
+    # Select the prior to use.
+    if args.prior_index is None:
+        args.prior_index = args.data_index
+    priorModel = obs.createSource(args.prior_index).rotate(args.rotate*galsim.degrees)
+
     # Analyze stamps using the truth source prior for the first stamp.
-    # Create an unlensed source prior for this stamp using truth info.
-    prior = obs.createSource(args.stamp).rotate(args.rotate*galsim.degrees)
-    estimator.usePrior(prior,fluxSigmaFraction = 0.1)
+    estimator.usePrior(priorModel,fluxSigmaFraction = 0.1)
 
     # Find the global minimum NLL wrt (x,y,theta) for the true shear.
     ig,idata = 0,0
