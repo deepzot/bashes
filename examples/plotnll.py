@@ -47,6 +47,15 @@ def main():
     params = obs.getTruthParams()
     noiseVarTruth = params['noise']['variance']
 
+    # Lookup the catalog truth for this stamp.
+    truth = obs.getTruthCatalog()[args.stamp]
+
+    # Center the estimator shear grid on the true shear. Note that this
+    # effectively ignores any g1,g2_center values given on the command line.
+    # TODO: rework Estimator.addArgs to optionally exclude some args.
+    args.g1_center = truth['g1']
+    args.g2_center = truth['g2']
+
     # Build the estimator for this analysis (using only the first stamp, for now)
     estimator = bashes.Estimator(
         data=stamp,psfs=psfModel,ivar=1./noiseVarTruth,
@@ -57,8 +66,39 @@ def main():
     prior = obs.createSource(args.stamp)
     estimator.usePrior(prior,fluxSigmaFraction = 0.1)
 
+    # Find the global minimum NLL wrt (x,y,theta) for the true shear.
+    ig,idata = 0,0
+    nllMin = np.min(estimator.nll[:,ig,idata,:])
+
     # Initialize matplotlib.
-    fig1 = plt.figure('fig1',figsize=(6,6))
+    fig1 = plt.figure('fig1',figsize=(12,9))
+    ncol = 5
+    nrow = 1+(args.ntheta+ncol-1)//ncol
+    xy = estimator.xyGrid
+    dxy = xy[1] - xy[0]
+    xyEdges = np.linspace(xy[0]-dxy/2,xy[-1]+dxy/2,len(xy)+1)
+    xyEdges[0] = xy[0]
+    xyEdges[-1] = xy[-1]
+    # Lookup the true centroid shift.
+    dx = truth['xshift']
+    dy = truth['yshift']
+    # Initialize contour levels relative to the global minimum NLL.
+    nllContours = np.arange(1,11) + nllMin
+    # Loop over theta values.
+    for ith in range(args.ntheta):
+        # Plot NLL(x,y,theta) vs (x,y) at this theta.
+        plt.subplot(nrow,ncol,ith+1)
+        nll = estimator.nll[ith,ig,idata].reshape((args.nxy,args.nxy))
+        plt.pcolormesh(xyEdges,xyEdges,nll,cmap='rainbow',rasterized=True)
+        # Superimpose contours relative to the global minimum in (x,y,theta).
+        plt.contour(xy,xy,nll,levels=nllContours,colors='w',linestyles='-')
+        # Draw a marker at the true centroid position.
+        plt.plot(dx,dy,marker='x',color='w')
+        # Remove tick labels.
+        axes = plt.gca()
+        axes.xaxis.set_ticklabels([])
+        axes.yaxis.set_ticklabels([])
+    plt.show()
 
 if __name__ == '__main__':
     main()

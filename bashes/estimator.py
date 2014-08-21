@@ -137,9 +137,9 @@ class Estimator(object):
                 idata = 0
                 convolved = galsim.Convolve(transformed,self.psfs)
                 # Loop over x,y shifts.
-                for ix,dx in enumerate(self.xyGrid):
-                    for iy,dy in enumerate(self.xyGrid):
-                        ixy = ix*self.nxy + iy
+                for iy,dy in enumerate(self.xyGrid):
+                    for ix,dx in enumerate(self.xyGrid):
+                        ixy = iy*self.nxy + ix
                         model = convolved.shift(dx=dx*self.pixelScale,dy=dy*self.pixelScale)
                         # Render the fully-specified model.
                         pixels = bashes.render(model,scale=self.pixelScale,size=self.stampSize)
@@ -169,5 +169,4 @@ class Estimator(object):
         erfArg2 = 1./root2r
         Gamma = (1 + scipy.special.erf(erfArg1))/(1 + scipy.special.erf(erfArg2))/gamma
         # Calculate the negative log of the flux-integrated likelihood
-        nll = psi - np.log(Gamma)
-        print nll
+        self.nll = psi - np.log(Gamma)
