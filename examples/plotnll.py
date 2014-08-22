@@ -43,10 +43,7 @@ def main():
     obs = bashes.great3.Observation(**bashes.great3.Observation.fromArgs(args))
 
     # Load the one simulated postage stamp we will use to generate plots.
-    dataStamps = obs.getImage()
-    iy = args.data_index//dataStamps.ny
-    ix = args.data_index%dataStamps.ny
-    stamp = dataStamps.getStamp(ix,iy)
+    stamps = obs.getImage().getStamp(args.data_index)
 
     # Create the PSF model for this stamp using truth info.
     psfModel = obs.createPSF(args.data_index)

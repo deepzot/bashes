@@ -12,8 +12,6 @@ def main():
 
     # Parse command-line args.
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--ds9', action = 'store_true',
-        help = 'display results in DS9')
     bashes.great3.Observation.addArgs(parser)
     bashes.Estimator.addArgs(parser)
     args = parser.parse_args()

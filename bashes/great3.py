@@ -5,8 +5,7 @@ import numpy as np
 from astropy.io import fits
 import yaml
 import galsim
-
-from . import utility,tiled
+import bashes
 
 class Observation(object):
     """
@@ -71,6 +70,9 @@ class Observation(object):
             assert self.epoch >= 0 and self.epoch < self.nEpochs
         except (ValueError,AssertionError):
             raise RuntimeError('Invalid branch epoch index: %r' % epoch)
+        # Our galaxy and star images are loaded on demand.
+        self.image = None
+        self.stars = None
         # Our truth params and catalog are loaded on demand.
         self.truthParams = None
         self.truthCatalog = None
@@ -99,35 +101,43 @@ class Observation(object):
         # Return a dictionary of constructor parameters provided in args.
         return { key:argsDict[key] for key in (set(pnames) & set(argsDict)) }
 
+    @classmethod
+    def getGSParams(cls):
+        if not hasattr(cls,'GSParams'):
+            cls.GSParams = galsim.GSParams(maximum_fft_size=2**16)
+        return cls.GSParams
+
     def getImage(self):
         """
         Returns the array of postage stamp image data for this observation and initializes
         our stampSize data member.
         """
-        dataStampsPath = os.path.join(self.branchPath,'image-%03d-%d.fits' % (
-            self.index,self.epoch))
-        hduList = fits.open(dataStampsPath)
-        dataStamps = hduList[0].data
-        hduList.close()
-        # Check for the expected image dimensions.
-        assert dataStamps.shape[0] == dataStamps.shape[1], 'Image data is not square'
-        assert dataStamps.shape[0] == 100*self.stampSize, 'Image has unexpected dimensions'
-        img = tiled.Tiled(dataStamps,self.stampSize)
-        img.scale = self.pixelScale
-        return img
+        if self.image is None:
+            dataStampsPath = os.path.join(self.branchPath,'image-%03d-%d.fits' % (
+                self.index,self.epoch))
+            hduList = fits.open(dataStampsPath)
+            dataStamps = hduList[0].data
+            hduList.close()
+            # Check for the expected image dimensions.
+            assert dataStamps.shape[0] == dataStamps.shape[1], 'Image data is not square'
+            assert dataStamps.shape[0] == 100*self.stampSize, 'Image has unexpected dimensions'
+            self.image = bashes.tiled.Tiled(dataStamps,self.stampSize)
+            self.image.scale = self.pixelScale
+        return self.image
 
     def getStars(self):
         """
         Returns the array of postage stamp starfield data for this observation.
         """
-        psfStampsPath = os.path.join(self.branchPath,'starfield_image-%03d-%d.fits' % (
-            self.index,self.epoch))
-        hduList = fits.open(psfStampsPath)
-        psfStamps = hduList[0].data
-        hduList.close()
-        img = tiled.Tiled(psfStamps,self.stampSize)
-        img.scale = self.pixelScale
-        return img
+        if self.stars is None:
+            psfStampsPath = os.path.join(self.branchPath,'starfield_image-%03d-%d.fits' % (
+                self.index,self.epoch))
+            hduList = fits.open(psfStampsPath)
+            psfStamps = hduList[0].data
+            hduList.close()
+            self.stars = bashes.tiled.Tiled(psfStamps,self.stampSize)
+            self.stars.scale = self.pixelScale
+        return self.stars
 
     def getTruthParams(self):
         """
@@ -158,26 +168,36 @@ class Observation(object):
             hduList.close()
         return self.truthCatalog
 
-    def createSource(self,galaxyIndex):
+    def createSource(self,galaxyIndex,shifted = False,lensed = False):
         """
-        Returns a GalSim model of the unlensed source for the specified galaxy index.
+        Returns a GalSim model of the source for the specified galaxy index with
+        optional centroid shifts and weak lensing distortion.
         """
         params = self.getTruthCatalog()[galaxyIndex]
         # Create the bulge component.
         bulge = galsim.Sersic(flux = params['bulge_flux'],
             half_light_radius = params['bulge_hlr'],
-            n = params['bulge_n'])
+            n = params['bulge_n'], gsparams = Observation.getGSParams())
         bulge.applyShear(q = params['bulge_q'],
             beta = params['bulge_beta_radians']*galsim.radians)
         # Is there a disk component?
         if params['disk_flux'] > 0:
             disk = galsim.Exponential(flux = params['disk_flux'],
-                half_light_radius = params['disk_hlr'])
+                half_light_radius = params['disk_hlr'],
+                gsparams = Observation.getGSParams())
             disk.applyShear(q = params['disk_q'],
                 beta = params['disk_beta_radians']*galsim.radians)
             source = galsim.Add(bulge,disk)
         else:
             source = bulge
+        # Apply optional centroid shift.
+        if shifted:
+            source = source.shift(
+                dx=params['xshift']*self.pixelScale,
+                dy=params['yshift']*self.pixelScale)
+        # Apply optional lensing.
+        if lensed:
+            source = source.lens(g1=params['g1'],g2=params['g2'],mu=params['mu'])
         return source
 
     def createPSF(self,galaxyIndex):
@@ -221,31 +241,27 @@ class Observation(object):
                 e = params['atmos_psf_e'])
             models.append(atmosphericPSF)
         # Return the convolution of all PSF component models.
-        return galsim.Convolve(models)
+        return galsim.Convolve(models, gsparams = Observation.getGSParams())
 
-    def createObject(self,galaxyIndex):
+    def createObject(self,galaxyIndex,shifted = True,lensed = True):
         """
         Returns a GalSim model of the object corresponding to the specified galaxy index,
         consisting of the source model with lensing distortion and centroid shift applied,
         and convolved with the appropriate PSF.
         """
         # Look up the component models.
-        src = self.createSource(galaxyIndex)
+        src = self.createSource(galaxyIndex,shifted,lensed)
         psf = self.createPSF(galaxyIndex)
-        # Apply source transforms.
-        params = self.getTruthCatalog()[galaxyIndex]
-        transformed = src.shear(g1=params['g1'],g2=params['g2']).shift(
-            dx=params['xshift']*self.pixelScale,
-            dy=params['yshift']*self.pixelScale)
-        return galsim.Convolve(transformed,psf)
+        # Return their convolution.
+        return galsim.Convolve(src,psf)
 
-    def renderObject(self,galaxyIndex,addNoise=True):
+    def renderObject(self,galaxyIndex,shifted = True,lensed = True,addNoise = True):
         """
         Renders a postage stamp of the truth model for the specified galaxy index
-        with optional noise (that will match the noise used for GREAT3).
+        with optional noise (that will exactly match the noise used for GREAT3).
         """
         obj = self.createObject(galaxyIndex)
-        stamp = utility.render(obj,self.pixelScale,size = self.stampSize)
+        stamp = bashes.utility.render(obj,self.pixelScale,size = self.stampSize)
         if addNoise:
             params = self.getTruthParams()
             seed = params['noise_seed']
@@ -254,3 +270,82 @@ class Observation(object):
             noise = galsim.GaussianNoise(rng).withVariance(var)
             stamp.addNoise(noise)
         return stamp
+
+def main():
+
+    import argparse
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    Observation.addArgs(parser)
+    parser.add_argument('--stamp', type = int, default = 0,
+        help = 'index of stamp to use (0-99999)')
+    parser.add_argument('--unlensed', action = 'store_true',
+        help = 'do not include weak lensing effects')
+    parser.add_argument('--test', action = 'store_true',
+        help = 'test that stamp reconstructed from truth matches actual stamp')
+    parser.add_argument('--ds9', action = 'store_true',
+        help = 'display stamps in DS9')
+    parser.add_argument('--save', type = str, default = None,
+        help = 'save stamps to the specified FITS file')
+    parser.add_argument('--truth', action = 'store_true',
+        help = 'print catalog truth parameter values')
+    args = parser.parse_args()
+
+    # Initialize the requested observation.
+    obs = Observation(**Observation.fromArgs(args))
+
+    # Dump catalog truth info for this stamp if requested.
+    if args.truth:
+        import pprint
+        catalog = obs.getTruthCatalog()
+        truth = zip(catalog.columns.names,catalog[args.stamp])
+        pprint.pprint(truth)
+
+    # Render stamps if requested.
+    if args.ds9 or args.save or args.test:
+        lensed = not args.unlensed
+        # Lookup the specified stamp's psf and source models.
+        psfModel = obs.createPSF(args.stamp)
+        srcModel = obs.createSource(args.stamp,shifted=True,lensed=lensed)
+
+        # Render the PSF and source models separately.
+        gsp = galsim.GSParams(maximum_fft_size = 2**16)
+        psfStamp = bashes.utility.render(psfModel,obs.pixelScale,size=obs.stampSize)
+        srcStamp = bashes.utility.render(srcModel,obs.pixelScale,size=obs.stampSize)
+
+        # Render the combined object with and without noise.
+        objStamp = obs.renderObject(args.stamp,shifted=True,lensed=lensed,addNoise=False)
+        noiseStamp = obs.renderObject(args.stamp,shifted=True,lensed=lensed,addNoise=True)
+
+        if args.test:
+            dataStamp = obs.getImage().getStamp(args.stamp)
+
+        if args.ds9:
+            display = bashes.display.Display('cmap heat; scale sqrt')
+            display.show(psfStamp)
+            display.show(srcStamp)
+            display.show(noiseStamp)
+            if args.test:
+                display.show(dataStamp,reuseLimits=True)
+            display.show(objStamp,reuseLimits=True)
+
+        if args.save:
+            # Open this file using: ds9 -zoom to fit -color heat -multiframe <filename>
+            stamps = [objStamp,psfStamp,srcStamp,noiseStamp]
+            if args.test:
+                stamps.append(dataStamp)
+            galsim.fits.writeMulti(stamps, file_name = args.save)
+
+        if args.test:
+            delta = noiseStamp.array - dataStamp.array
+            adiff = np.max(np.abs(delta))
+            nonzero = dataStamp.array != 0
+            rdiff = np.max(np.abs(delta[nonzero]/dataStamp.array[nonzero]))
+            print 'Max difference between generated and saved stamps: %.3g (abs) %.3g (rel)' % (
+                adiff,rdiff)
+            noiseVar = obs.getTruthParams()['noise']['variance']
+            print 'Std. deviation of differences / noise RMS = %.3g' % (
+                np.std(delta)/np.sqrt(noiseVar))
+
+if __name__ == "__main__":
+    main()
+

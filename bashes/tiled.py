@@ -52,10 +52,14 @@ class Tiled(galsim.Image):
         ssize = self.stampSize
         return galsim.BoundsI(ix*ssize, (ix+1)*ssize-1, iy*ssize, (iy+1)*ssize-1)
 
-    def getStamp(self,ix,iy):
+    def getStamp(self,ix,iy = None):
         """
-        Returns the postage stamp at the tile coords (ix,iy).
+        Returns the postage stamp at the tile coords (ix,iy). If iy is None, then ix
+        is interpreted as iy*ny + ix.
         """
+        if iy is None:
+            iy = ix//self.ny
+            ix = ix%self.ny
         bbox = self.getStampBounds(ix,iy)
         return self[bbox]
 
