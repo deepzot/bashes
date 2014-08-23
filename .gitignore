@@ -23,3 +23,8 @@
 # Byte-compiled / optimized / DLL files for python
 __pycache__/
 *.py[cod]
+
+# Sconstruct temporary files
+.sconsign.dblite
+.sconf_temp
+config.log
