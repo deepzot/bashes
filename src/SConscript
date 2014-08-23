@@ -1,0 +1,11 @@
+# SConscript is python -*-Python-*-
+
+Import('env')
+
+#env.SharedLibrary('bashes',[
+#	'H5File.cc','DataStamps.cc','PriorStamps.cc','H5Save.cc','Prior.cc','ImageFile.cc','ThreadPool.cc'
+#	],LIBS=['galsim','cfitsio','hdf5','boost_thread','boost_system'])
+
+env.SharedLibrary('bashes',[
+	'Estimator.cc'
+	],LIBS=['boost_thread','boost_system'])

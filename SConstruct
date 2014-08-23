@@ -69,7 +69,7 @@ if not conf.CheckCXXHeader('boost/system/error_code.hpp'):
 env = conf.Finish()
 
 # build C++ library
-#SConscript('src/SConscript', exports='env', variant_dir='build')
+SConscript('src/SConscript', exports='env', variant_dir='build')
 
 # build C++ programs
 penv = env.Clone()
