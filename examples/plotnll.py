@@ -43,7 +43,7 @@ def main():
     obs = bashes.great3.Observation(**bashes.great3.Observation.fromArgs(args))
 
     # Load the one simulated postage stamp we will use to generate plots.
-    stamps = obs.getImage().getStamp(args.data_index)
+    stamp = obs.getImage().getStamp(args.data_index)
 
     # Create the PSF model for this stamp using truth info.
     psfModel = obs.createPSF(args.data_index)
@@ -63,7 +63,7 @@ def main():
 
     # Build the estimator for this analysis (using only the first stamp, for now)
     estimator = bashes.Estimator(
-        data=stamps,psfs=psfModel,ivar=1./noiseVarTruth,
+        data=stamp,psfs=psfModel,ivar=1./noiseVarTruth,
         stampSize=obs.stampSize,pixelScale=obs.pixelScale,**bashes.Estimator.fromArgs(args))
 
     # Select the prior to use.
