@@ -345,6 +345,11 @@ def main():
             noiseVar = obs.getTruthParams()['noise']['variance']
             print 'Std. deviation of differences / noise RMS = %.3g' % (
                 np.std(delta)/np.sqrt(noiseVar))
+            close = np.allclose(noiseStamp.array,dataStamp.array)
+            print 'All pixels close?',close
+            if not close:
+                # Return a non-zero exit code to support scripting.
+                return -1
 
 if __name__ == "__main__":
     main()
