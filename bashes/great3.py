@@ -190,14 +190,14 @@ class Observation(object):
             source = galsim.Add(bulge,disk)
         else:
             source = bulge
+        # Apply optional lensing.
+        if lensed:
+            source = source.lens(g1=params['g1'],g2=params['g2'],mu=params['mu'])
         # Apply optional centroid shift.
         if shifted:
             source = source.shift(
                 dx=params['xshift']*self.pixelScale,
                 dy=params['yshift']*self.pixelScale)
-        # Apply optional lensing.
-        if lensed:
-            source = source.lens(g1=params['g1'],g2=params['g2'],mu=params['mu'])
         return source
 
     def createPSF(self,galaxyIndex):
@@ -345,6 +345,11 @@ def main():
             noiseVar = obs.getTruthParams()['noise']['variance']
             print 'Std. deviation of differences / noise RMS = %.3g' % (
                 np.std(delta)/np.sqrt(noiseVar))
+            close = np.allclose(noiseStamp.array,dataStamp.array)
+            print 'All pixels close?',close
+            if not close:
+                # Return a non-zero exit code to support scripting.
+                return -1
 
 if __name__ == "__main__":
     main()
