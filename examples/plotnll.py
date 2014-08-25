@@ -63,7 +63,7 @@ def main():
 
     # Build the estimator for this analysis (using only the first stamp, for now)
     estimator = bashes.Estimator(
-        data=stamp,psfs=psfModel,ivar=1./noiseVarTruth,
+        data=stamps,psfs=psfModel,ivar=1./noiseVarTruth,
         stampSize=obs.stampSize,pixelScale=obs.pixelScale,**bashes.Estimator.fromArgs(args))
 
     # Select the prior to use.
