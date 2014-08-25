@@ -14,15 +14,7 @@ def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     bashes.great3.Observation.addArgs(parser)
     bashes.Estimator.addArgs(parser)
-    parser.add_argument('--ds9', action='store_true',
-        help = 'Display data stamps using ds9')
     args = parser.parse_args()
-
-    # initialize the optional display
-    if args.ds9:
-        display = bashes.Display('cmap heat; scale sqrt')
-    else:
-        display = None
 
     # Initialize the GREAT3 observation we will analyze.
     obs = bashes.great3.Observation(**bashes.great3.Observation.fromArgs(args))
@@ -36,14 +28,6 @@ def main():
     # Load the true noise variance used to simulate this epoch.
     params = obs.getTruthParams()
     noiseVarTruth = params['noise']['variance']
-
-    if display:
-        # Display one data stamp.
-        ix,iy = 25,75
-        display.show(dataStamps.getStamp(ix,iy))
-        # Display our reconstruction of the same data stamp.
-        display.show(obs.renderObject(100*iy+ix,addNoise=True))
-        return
 
     # Build the estimator for this analysis (using only the first stamp, for now)
     psfModel = obs.createPSF(0)
