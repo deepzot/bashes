@@ -165,7 +165,7 @@ class Estimator(object):
                         ixy = iy*self.nxy + ix
                         model = convolved.shift(dx=dx*self.pixelScale,dy=dy*self.pixelScale)
                         # Render the fully-specified model.
-                        pixels = bashes.render(model,scale=self.pixelScale,size=self.stampSize)
+                        pixels = bashes.utility.render(model,scale=self.pixelScale,size=self.stampSize)
                         if self.featureMatrix:
                             features = self.featureMatrix.dot(pixels.array.flat)
                         else:
