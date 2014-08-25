@@ -14,6 +14,8 @@ def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     bashes.great3.Observation.addArgs(parser)
     bashes.Estimator.addArgs(parser)
+    parser.add_argument('--ds9', action='store_true',
+        help = 'Display data stamps using ds9')
     args = parser.parse_args()
 
     # initialize the optional display
