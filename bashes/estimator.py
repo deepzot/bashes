@@ -63,17 +63,15 @@ class Estimator(object):
                     features = pixels
                 self.data[i] = features
 
-        # Save the PSF image for each stamp.
-        if isinstance(psfs,galsim.GSObject):
-            self.psfIsConstant = True
+        # Save the PSF model for each stamp. For now we assume that psfs is an
+        # iterable collection of galsim.GSObject models.
+        try:
+            assert len(psfs) == self.ndata, 'Expected same number of stamps and PSFs'
+            for i,psf in enumerate(psfs):
+                assert isinstance(psf,galsim.GSObject), 'PSF[%d] is not a GSObject' % i
             self.psfs = psfs
-        elif psfs.shape == (self.stampSize,self.stampSize):
-            self.psfIsConstant = True
-            self.psfs = psfs
-        else:
-            self.psfIsConstant = False
-            # Handle a 3D or 2D array of PSF stamps...
-            assert False,'Non-constant PSFs not supported yet'
+        except TypeError:
+            raise RuntimeError('PSFs are not iterable')
 
         # Save the inverse variance vector for each stamp.
         try:

@@ -23,24 +23,22 @@ def main():
     # Initialize the GREAT3 observation we will analyze.
     obs = bashes.great3.Observation(**bashes.great3.Observation.fromArgs(args))
 
-    # Load the postage stamps to analyze.
+    # Load the postage stamps to analyze and their corresponding PSF models.
     image = obs.getImage()
     nstamps = args.nstamps if args.nstamps > 0 else image.nx*image.ny
     dataStamps = np.empty((nstamps,obs.stampSize,obs.stampSize))
+    psfModels = [ ]
     for i in range(nstamps):
         dataStamps[i] = image.getStamp(i).array
-
-    # Load the constant PSF stamp to use for the analysis.
-    psfStamps = obs.getStars()
+        psfModels.append(obs.createPSF(i))
 
     # Load the true noise variance used to simulate this epoch.
     params = obs.getTruthParams()
     noiseVarTruth = params['noise']['variance']
 
     # Build the estimator for this analysis (using only the first stamp, for now)
-    psfModel = obs.createPSF(0)
     estimator = bashes.Estimator(
-        data=dataStamps,psfs=psfModel,ivar=1./noiseVarTruth,
+        data=dataStamps,psfs=psfModels,ivar=1./noiseVarTruth,
         stampSize=obs.stampSize,pixelScale=obs.pixelScale,**bashes.Estimator.fromArgs(args))
 
     # Analyze stamps using the truth source prior for the first stamp.
