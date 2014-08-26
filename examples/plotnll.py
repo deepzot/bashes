@@ -112,25 +112,26 @@ def main():
         axes.set_yticks(coarseGrid)
         # Draw a marker at the true (x,y) centroid location.
         plt.plot(dx,dy,'r*',markersize=15)
-        # Plot NLL(theta) after (x,y) marginalization.
-        ax1 = plt.subplot(nrow,1,nrow)
-        nllTheta = estimator.getNllFine(ig,idata)
-        nllThetaMin = np.min(nllTheta)
-        dnllTheta = nllTheta - nllThetaMin
-        ax1.plot(estimator.thetaFine,dnllTheta,'b--')
-        ax1.plot(estimator.thetaGrid,
-            estimator.nllTheta[:,ig,idata]-nllThetaMin,'k.',markersize=10)
-        yrange = np.max(dnllTheta)
-        plt.ylim((-0.05*yrange,1.05*yrange))
-        plt.xlabel('Source rotation (deg)')
-        plt.ylabel('NLL - min(NLL)')
-        # Superimpose the likelihood exp(-NLL(theta)).
-        ax2 = ax1.twinx()
-        ax2.yaxis.set_ticklabels([])
-        ax2.plot(estimator.thetaFine,np.exp(-dnllTheta),'b-')
-        # Draw a marker at the true value.
-        plt.ylim((0.,1.05))
-        ax2.plot(args.rotate,0.15,'r*',markersize=15)
+    # Plot NLL(theta) after (x,y) marginalization.
+    ax1 = plt.subplot(nrow,1,nrow)
+    nllTheta = estimator.getNllFine(ig,idata)
+    nllThetaMin = np.min(nllTheta)
+    print 'min(NLL) =',nllThetaMin
+    dnllTheta = nllTheta - nllThetaMin
+    ax1.plot(estimator.thetaFine,dnllTheta,'b--')
+    ax1.plot(estimator.thetaGrid,
+        estimator.nllTheta[:,ig,idata]-nllThetaMin,'k.',markersize=10)
+    yrange = np.max(dnllTheta)
+    plt.ylim((-0.05*yrange,1.05*yrange))
+    plt.xlabel('Source rotation (deg)')
+    plt.ylabel('NLL - min(NLL)')
+    # Superimpose the likelihood exp(-NLL(theta)).
+    ax2 = ax1.twinx()
+    ax2.yaxis.set_ticklabels([])
+    ax2.plot(estimator.thetaFine,np.exp(-dnllTheta),'b-')
+    # Draw a marker at the true value.
+    plt.ylim((0.,1.05))
+    ax2.plot(args.rotate,0.15,'r*',markersize=15)
     plt.show()
 
 if __name__ == '__main__':
