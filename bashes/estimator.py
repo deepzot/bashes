@@ -51,7 +51,17 @@ class Estimator(object):
                     self.data[iy*nx+ix] = features
         else:
             # Handle a 3D array of data stamps...
-            assert False,'3D data array not supported yet'
+            assert data.shape[1] == stampSize and data.shape[2] == stampSize, (
+                'Input data has unexpected stamp size')
+            self.ndata = data.shape[0]
+            self.data = np.empty((self.ndata,self.nfeatures))
+            for i in range(self.ndata):
+                pixels = data[i].flat
+                if self.featureMatrix:
+                    features = self.featureMatrix.dot(pixels)
+                else:
+                    features = pixels
+                self.data[i] = features
 
         # Save the PSF image for each stamp.
         if isinstance(psfs,galsim.GSObject):
