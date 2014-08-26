@@ -77,5 +77,5 @@ def load(name):
     if not os.path.exists(name):
         raise RuntimeError('Config not found: %r' % name)
     with open(name,'r') as fin:
-        results = yaml.load(stream = fin)
-    return results
+        config = yaml.load(stream = fin)
+    return config
