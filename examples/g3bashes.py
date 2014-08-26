@@ -55,7 +55,7 @@ def main():
     for i in range(nstamps):
         prior = obs.createSource(i)
         if args.verbose:
-            traceMsg = 'prior %d/%d, theta %%d/%d, shear %%d/%d' % (i,nstamps,args.ntheta,args.nshear**2)
+            traceMsg = 'prior %d/%d, theta %%d/%d, shear %%d/%d' % (i,nstamps,args.ntheta,args.ng**2)
         estimator.usePrior(prior,fluxSigmaFraction = args.sigma_frac,traceMsg = traceMsg)
         # Save results for this prior in numpy format.
         saveFile = '%s_%d.npy' % (args.save,i)

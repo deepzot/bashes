@@ -15,7 +15,7 @@ class Estimator(object):
         stampSize,pixelScale,
         ntheta,nxy,xymax,
         xy_oversampling,theta_oversampling,
-        nshear,gmax,g1_center,g2_center,
+        ng,gmax,g1_center,g2_center,
         featureMatrix = None):
 
         self.stampSize = stampSize
@@ -108,12 +108,14 @@ class Estimator(object):
         self.xyFine = np.linspace(-xymax + 0.5*dxyFine,+xymax - 0.5*dxyFine,nxyFine)
 
         # Initialize our (g1,g2) grid.
-        self.nshear = nshear
-        dg = np.linspace(-gmax,+gmax,nshear)
-        self.g1,self.g2 = np.meshgrid(g1_center+dg,g2_center+dg)
+        dg = np.linspace(-gmax,+gmax,ng)
+        g1,g2 = np.meshgrid(g1_center+dg,g2_center+dg)
+        self.g1vec = g1.flat
+        self.g2vec = g2.flat
+        self.nshear = len(self.g1vec)
 
         # Initialize float32 storage for the feature values we will calculate in parallel.
-        self.M = np.empty((self.ntheta,self.nshear**2,self.ndata,self.nxy**2,self.nfeatures),
+        self.M = np.empty((self.ntheta,self.nshear,self.ndata,self.nxy**2,self.nfeatures),
             dtype=np.float32)
         # Initialize storage for marginalized NLL arrays.
         self.nllTheta = np.empty((self.ntheta,self.nshear,self.ndata))
@@ -135,8 +137,8 @@ class Estimator(object):
             help = 'Amount of interpolated oversampling to use in x,y (1 = none)')
         parser.add_argument('--theta-oversampling', type = int, default = 32,
             help = 'Amount of interpolated oversampling to use in theta (1 = none)')
-        parser.add_argument('--nshear', type = int, default = 5,
-            help = 'Number of reduced shear values for sampling the likelihood')
+        parser.add_argument('--ng', type = int, default = 5,
+            help = 'Number of g1,g2 values for sampling the likelihood')
         parser.add_argument('--gmax', type = float, default = 0.06,
             help = 'Range of reduced shear for sampling the likelihood')
         parser.add_argument('--g1-center', type = float, default = 0.,
@@ -160,7 +162,7 @@ class Estimator(object):
         # Loop over rotations.
         for ith,theta in enumerate(self.thetaGrid):
             # Loop over shears.
-            for ig,(g1,g2) in enumerate(zip(self.g1.flat,self.g2.flat)):
+            for ig,(g1,g2) in enumerate(zip(self.g1vec,self.g2vec)):
                 if traceMsg:
                     print traceMsg % (ith,ig)
                 # Apply rotation and shear transforms.
@@ -203,7 +205,7 @@ class Estimator(object):
         # Calculate the negative log of the flux-integrated likelihood
         self.nllXYTheta = psi - np.log(Gamma)
         # Loop over shears and data stamps to perform marginalization integrals.
-        for ig in range(len(self.g1)):
+        for ig in range(self.nshear):
             for idata in range(self.ndata):
                 # Marginalize nll(x,y,theta) over (x,y) for each theta.
                 for ith in range(self.ntheta):
