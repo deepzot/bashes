@@ -40,6 +40,11 @@ def main():
     params = obs.getTruthParams()
     noiseVarTruth = params['noise']['variance']
 
+    # Save our config if requested.
+    if args.save:
+        config = bashes.config.Config(args)
+        config.save(args.save)
+
     # Build the estimator for this analysis (using only the first stamp, for now)
     estimator = bashes.Estimator(
         data=dataStamps,psfs=psfModels,ivar=1./noiseVarTruth,

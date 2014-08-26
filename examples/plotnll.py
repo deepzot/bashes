@@ -28,6 +28,8 @@ def main():
         help = 'Amount to offset g1 component of estimator shear from true value')
     parser.add_argument('--dg2', type = float, default = 0.,
         help = 'Amount to offset g2 component of estimator shear from true value')
+    parser.add_argument('--save', type = str, default = None,
+        help = 'base filename for saving results')
     bashes.Estimator.addArgs(parser)
     args = parser.parse_args()
 
@@ -38,6 +40,11 @@ def main():
     if args.prior_index is not None and (args.prior_index < 0 or args.prior_index >= 10000):
         print 'prior index %d is outside of valid range 0-10000' % args.prior_index
         return -1
+
+    # Save our config if requested.
+    if args.save:
+        config = bashes.config.Config(args)
+        config.save(args.save)
 
     # Initialize the GREAT3 observation we will analyze.
     obs = bashes.great3.Observation(**bashes.great3.Observation.fromArgs(args))
