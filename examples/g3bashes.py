@@ -14,10 +14,14 @@ def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     bashes.great3.Observation.addArgs(parser)
     bashes.Estimator.addArgs(parser)
+    parser.add_argument('--sigma-frac', type = float, default = 0.1,
+        help = 'fraction of flux prior to use as flux sigma')
     parser.add_argument('--nstamps', type = int, default = 0,
         help = 'number of stamps to include in the analysis (or 0 to use all stamps)')
     parser.add_argument('--save', type = str, default = 'bashes',
         help = 'base filename used to save estimator results for each prior')
+    parser.add_argument('--verbose', action = 'store_true',
+        help = 'be verbose about progress')
     args = parser.parse_args()
 
     # Initialize the GREAT3 observation we will analyze.
@@ -42,11 +46,17 @@ def main():
         stampSize=obs.stampSize,pixelScale=obs.pixelScale,**bashes.Estimator.fromArgs(args))
 
     # Analyze stamps using the truth source priors for each stamp.
+    traceMsg = None
     for i in range(nstamps):
         prior = obs.createSource(i)
-        estimator.usePrior(prior,fluxSigmaFraction = 0.1)
+        if args.verbose:
+            traceMsg = 'prior %d/%d, theta %%d/%d, shear %%d/%d' % (i,nstamps,args.ntheta,args.nshear**2)
+        estimator.usePrior(prior,fluxSigmaFraction = args.sigma_frac,traceMsg = traceMsg)
         # Save results for this prior in numpy format.
-        np.save('%s_%d.npy' % (args.save,i),estimator.nll)
+        saveFile = '%s_%d.npy' % (args.save,i)
+        np.save(saveFile,estimator.nll)
+        if args.verbose:
+            print 'Saved estimator results for prior %d to %s' % (i,saveFile)
 
 if __name__ == '__main__':
     main()

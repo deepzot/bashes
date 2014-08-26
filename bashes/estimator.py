@@ -156,12 +156,13 @@ class Estimator(object):
         # Return a dictionary of constructor parameters provided in args.
         return { key:argsDict[key] for key in (set(pnames) & set(argsDict)) }
 
-    def usePrior(self,sourceModel,fluxSigmaFraction,weight=1.):
+    def usePrior(self,sourceModel,fluxSigmaFraction,weight=1.,traceMsg=None):
         # Loop over rotations.
         for ith,theta in enumerate(self.thetaGrid):
             # Loop over shears.
             for ig,(g1,g2) in enumerate(zip(self.g1.flat,self.g2.flat)):
-                print (ith,ig)
+                if traceMsg:
+                    print traceMsg % (ith,ig)
                 # Apply rotation and shear transforms.
                 transformed = sourceModel.rotate(theta*galsim.degrees).shear(g1=g1,g2=g2)
                 # Loop over PSF models for each data stamp.
