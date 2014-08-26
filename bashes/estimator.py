@@ -83,6 +83,8 @@ class Estimator(object):
         # Precompute and save Dt.Cinv.D for each stamp
         D = self.data.reshape((self.ndata,self.nfeatures))
         self.DtCinvD = self.ivar*np.einsum('ce,ce->c',D,D)
+        # Reshape for broadcasting over MtCinvM.
+        self.DtCinvD = self.DtCinvD.reshape((1,1,self.ndata,1))
 
         # Initialize our coarse theta grid in degrees. We do not include the endpoint
         # because of the assumed periodicity.
@@ -111,14 +113,12 @@ class Estimator(object):
         self.g1,self.g2 = np.meshgrid(g1_center+dg,g2_center+dg)
 
         # Initialize float32 storage for the feature values we will calculate in parallel.
-        assert self.ndata == 1,'ndata > 1 not supported yet'
         self.M = np.empty((self.ntheta,self.nshear**2,self.ndata,self.nxy**2,self.nfeatures),
             dtype=np.float32)
         # Initialize storage for marginalized NLL arrays.
         self.nllTheta = np.empty((self.ntheta,self.nshear,self.ndata))
         self.nll = np.empty((self.nshear,self.ndata))
-        print 'allocated %ld (M) + %ld (nllTheta) bytes' % (
-            self.M.nbytes,self.nllTheta.nbytes)
+        print 'allocated %ld bytes for M' % self.M.nbytes
 
     @staticmethod
     def addArgs(parser):
@@ -164,21 +164,21 @@ class Estimator(object):
                 print (ith,ig)
                 # Apply rotation and shear transforms.
                 transformed = sourceModel.rotate(theta*galsim.degrees).shear(g1=g1,g2=g2)
-                # Loop over PSF models (assuming we have a single PSF model for now)
-                idata = 0
-                convolved = galsim.Convolve(transformed,self.psfs)
-                # Loop over x,y shifts.
-                for iy,dy in enumerate(self.xyGrid):
-                    for ix,dx in enumerate(self.xyGrid):
-                        ixy = iy*self.nxy + ix
-                        model = convolved.shift(dx=dx*self.pixelScale,dy=dy*self.pixelScale)
-                        # Render the fully-specified model.
-                        pixels = bashes.utility.render(model,scale=self.pixelScale,size=self.stampSize)
-                        if self.featureMatrix:
-                            features = self.featureMatrix.dot(pixels.array.flat)
-                        else:
-                            features = pixels.array.flat
-                        self.M[ith,ig,idata,ixy] = features
+                # Loop over PSF models for each data stamp.
+                for idata,psf in enumerate(self.psfs):
+                    convolved = galsim.Convolve(transformed,self.psfs[idata])
+                    # Loop over x,y shifts.
+                    for iy,dy in enumerate(self.xyGrid):
+                        for ix,dx in enumerate(self.xyGrid):
+                            ixy = iy*self.nxy + ix
+                            model = convolved.shift(dx=dx*self.pixelScale,dy=dy*self.pixelScale)
+                            # Render the fully-specified model.
+                            pixels = bashes.utility.render(model,scale=self.pixelScale,size=self.stampSize)
+                            if self.featureMatrix:
+                                features = self.featureMatrix.dot(pixels.array.flat)
+                            else:
+                                features = pixels.array.flat
+                            self.M[ith,ig,idata,ixy] = features
         # Calculate Mt.Cinv.M
         MtCinvM = self.ivar*np.einsum('abcde,abcde->abcd',self.M,self.M)
         # Calculate Dt.Cinv.M
