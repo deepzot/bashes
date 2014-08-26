@@ -32,3 +32,4 @@ config.log
 # Output files
 *.fits
 *.png
+*.npy

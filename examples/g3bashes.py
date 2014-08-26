@@ -14,6 +14,8 @@ def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     bashes.great3.Observation.addArgs(parser)
     bashes.Estimator.addArgs(parser)
+    parser.add_argument('--save', type = str, default = 'bashes.npy',
+        help = 'filename where analysis results will be saved in numpy format')
     args = parser.parse_args()
 
     # Initialize the GREAT3 observation we will analyze.
@@ -39,6 +41,9 @@ def main():
     prior = obs.createSource(0)
     priorFlux = prior.getFlux()
     estimator.usePrior(prior,fluxSigmaFraction = 0.1)
+
+    # Save results in numpy format.
+    np.save(args.save,estimator.nll)
 
 if __name__ == '__main__':
     main()
