@@ -46,7 +46,7 @@ def main():
     stamp = obs.getImage().getStamp(args.data_index)
 
     # Create the PSF model for this stamp using truth info.
-    psfModel = obs.createPSF(args.data_index)
+    psfModels = [ obs.createPSF(args.data_index) ]
 
     # Load the true noise variance used to simulate this epoch.
     params = obs.getTruthParams()
@@ -63,7 +63,7 @@ def main():
 
     # Build the estimator for this analysis (using only the first stamp, for now)
     estimator = bashes.Estimator(
-        data=stamp,psfs=psfModel,ivar=1./noiseVarTruth,
+        data=stamp,psfs=psfModels,ivar=1./noiseVarTruth,
         stampSize=obs.stampSize,pixelScale=obs.pixelScale,**bashes.Estimator.fromArgs(args))
 
     # Select the prior to use.
