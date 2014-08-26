@@ -1,8 +1,9 @@
 # SConstruct is python -*-Python-*-
 import os
+import distutils.sysconfig
 
 # initialize our build enviroment
-env = Environment(CPPPATH=['#'],LIBPATH=[])
+env = Environment(CPPPATH=['#include'],LIBPATH=[])
 
 # take PATH and LD_LIBRARY_PATH from the environment so currently configured
 # build tools are used
@@ -69,7 +70,7 @@ if not conf.CheckCXXHeader('boost/system/error_code.hpp'):
 env = conf.Finish()
 
 # build C++ library
-SConscript('src/SConscript', exports='env', variant_dir='build')
+SConscript('src/SConscript', exports='env')
 
 # build C++ programs
 penv = env.Clone()
