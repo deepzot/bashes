@@ -16,8 +16,8 @@ def main():
     bashes.Estimator.addArgs(parser)
     parser.add_argument('--nstamps', type = int, default = 0,
         help = 'number of stamps to include in the analysis (or 0 to use all stamps)')
-    parser.add_argument('--save', type = str, default = 'bashes.npy',
-        help = 'filename where analysis results will be saved in numpy format')
+    parser.add_argument('--save', type = str, default = 'bashes',
+        help = 'base filename used to save estimator results for each prior')
     args = parser.parse_args()
 
     # Initialize the GREAT3 observation we will analyze.
@@ -41,13 +41,12 @@ def main():
         data=dataStamps,psfs=psfModels,ivar=1./noiseVarTruth,
         stampSize=obs.stampSize,pixelScale=obs.pixelScale,**bashes.Estimator.fromArgs(args))
 
-    # Analyze stamps using the truth source prior for the first stamp.
-    prior = obs.createSource(0)
-    priorFlux = prior.getFlux()
-    estimator.usePrior(prior,fluxSigmaFraction = 0.1)
-
-    # Save results in numpy format.
-    np.save(args.save,estimator.nll)
+    # Analyze stamps using the truth source priors for each stamp.
+    for i in range(nstamps):
+        prior = obs.createSource(i)
+        estimator.usePrior(prior,fluxSigmaFraction = 0.1)
+        # Save results for this prior in numpy format.
+        np.save('%s_%d.npy' % (args.save,i),estimator.nll)
 
 if __name__ == '__main__':
     main()
