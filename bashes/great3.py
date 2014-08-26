@@ -329,7 +329,7 @@ def main():
             display.show(objStamp,reuseLimits=True)
 
         if args.save:
-            # Open this file using: ds9 -zoom to fit -color heat -multiframe <filename>
+            # Open this file using: ds9 -multiframe <filename> -zoom to fit -cmap heat
             stamps = [objStamp,psfStamp,srcStamp,noiseStamp]
             if args.test:
                 stamps.append(dataStamp)
