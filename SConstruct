@@ -66,11 +66,20 @@ if not conf.CheckCXXHeader('GalSim.h') or not conf.CheckLib('galsim',language='C
 takeFromEnv('BOOST_INC_DIR','BOOST_LIB_DIR')
 if not conf.CheckCXXHeader('boost/system/error_code.hpp'):
    Exit(1)
+
+# python
+pyIncDir = distutils.sysconfig.get_python_inc()
+pyLibDir = os.path.split(os.path.split(distutils.sysconfig.get_python_lib())[0])[0]
+conf.env.AppendUnique(CPPPATH=[pyIncDir])
+conf.env.AppendUnique(LIBPATH=[pyLibDir])
+#takeFromEnv('PYTHON_INC_DIR','PYTHON_LIB_DIR')
+
 # all done: update the build environment
 env = conf.Finish()
 
 # build C++ library
 SConscript('src/SConscript', exports='env')
+SConscript('pysrc/SConscript', exports='env')
 
 # build C++ programs
 penv = env.Clone()

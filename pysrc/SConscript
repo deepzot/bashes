@@ -1,0 +1,22 @@
+# SConscript is python -*-Python-*-
+
+import os
+import distutils.sysconfig
+
+Import('env')
+
+pyenv = env.Clone()
+
+# build object files in hidden sub directory
+pyenv['OBJPREFIX'] = '.obj/'
+
+pyenv.AppendUnique(LIBPATH=['#lib'])
+
+pylib = 'python'+distutils.sysconfig.get_python_version()
+
+pyenv.AppendUnique(LIBS=['boost_python',pylib,'bashes'])
+
+pyenv.LoadableModule(os.path.join('#bashes','_bashes'),[
+	'EstimatorEngine.cc'
+	],
+	LDMODULEPREFIX='', LDMODULESUFFIX='.so')
