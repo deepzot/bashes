@@ -10,9 +10,6 @@ pyenv = env.Clone()
 # build object files in hidden sub directory
 pyenv['OBJPREFIX'] = '.obj/'
 
-# bashes C++ library
-pyenv.AppendUnique(LIBPATH=['#lib'])
-
 # python include path
 pyIncDir = distutils.sysconfig.get_python_inc()
 pyenv.AppendUnique(CPPPATH=[pyIncDir])
@@ -26,9 +23,16 @@ import numpy
 npInc = numpy.get_include()
 pyenv.AppendUnique(CPPPATH=[npInc])
 
+# bashes C++ library
+pyenv.AppendUnique(LIBPATH=['#lib'])
+
 # build module
-pyenv.LoadableModule(os.path.join('#bashes','_bashes'),[
-	'EstimatorEngine.cc'
-	],
+sharedObj = pyenv.SharedObject([
+	'module.cc',
+	'EstimatorEngine.cc',
+	'EstimatorHelpers.cc'
+	])
+
+pyenv.LoadableModule(os.path.join('#bashes','_bashes'), sharedObj,
 	LDMODULEPREFIX='', LDMODULESUFFIX='.so',
 	LIBS=['boost_python',pylib,'bashes'])
