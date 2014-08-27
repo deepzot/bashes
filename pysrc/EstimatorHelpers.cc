@@ -2,7 +2,12 @@
 #include "boost/python/extract.hpp"
 #include "boost/python/numeric.hpp"
 
+// See http://docs.scipy.org/doc/numpy-dev/reference/c-api.deprecations.html
 //#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+
+// See http://docs.scipy.org/doc/numpy/reference/c-api.array.html#miscellaneous
+#define PY_ARRAY_UNIQUE_SYMBOL bashes_ARRAY_API
+#define NO_IMPORT_ARRAY
 #include "numpy/arrayobject.h"
 
 #include <iostream>
