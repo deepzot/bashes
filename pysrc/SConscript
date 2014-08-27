@@ -22,6 +22,10 @@ pyenv.AppendUnique(LIBPATH=[pyLibDir])
 # python library
 pylib = 'python'+distutils.sysconfig.get_python_version()
 
+import numpy
+npInc = numpy.get_include()
+pyenv.AppendUnique(CPPPATH=[npInc])
+
 # build module
 pyenv.LoadableModule(os.path.join('#bashes','_bashes'),[
 	'EstimatorEngine.cc'
