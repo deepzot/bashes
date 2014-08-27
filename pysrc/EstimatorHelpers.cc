@@ -13,23 +13,22 @@
 #include <iostream>
 
 namespace bp = boost::python;
-namespace bpn = boost::python::numeric;
 
 namespace bashes {
 
 namespace {
 
 // Example using only boost::python::numeric::array
-void printFirst(bpn::array data) {
+void printFirst(bp::numeric::array data) {
     // Access a built-in type (an array)
-    bpn::array a = data;
+    bp::numeric::array a = data;
     // Need to <extract> array elements because their type is unknown
     std::cout << "First array item: " << bp::extract<int>(a[0]) << std::endl;
 };
 
 // Example using numpy c-api constructs
 // see http://stackoverflow.com/questions/9128519/reading-many-values-from-numpy-c-api
-bp::object timesTwo(bpn::array m){
+bp::object timesTwo(bp::numeric::array m){
     // access underlying numpy PyObject pointer of input array
     PyObject* m_obj = PyArray_FROM_OTF(m.ptr(), NPY_DOUBLE, NPY_IN_ARRAY);
     // to avoid memory leaks, let a Boost::Python object manage the array
@@ -57,6 +56,7 @@ bp::object timesTwo(bpn::array m){
 } // anonymous
 
 void pyExportEstimatorHelpers() {
+    bp::numeric::array::set_module_and_type("numpy", "ndarray");
     bp::def("printFirst", &printFirst);
     bp::def("timesTwo", &timesTwo);
 }
