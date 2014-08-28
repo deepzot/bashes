@@ -91,8 +91,7 @@ def main():
     ncol = 5
     nrow = 1+(args.ntheta+ncol-1)//ncol
     xy = estimator.xyFine
-    dxy = xy[1] - xy[0]
-    xyEdges = np.linspace(xy[0]-dxy/2,xy[-1]+dxy/2,len(xy)+1)
+    xyEdges = bashes.utility.getBinEdges(xy,expand=True)
     coarseGrid = estimator.xyGrid[1:-1]
     # Lookup the true centroid shift.
     dx = truth['xshift']

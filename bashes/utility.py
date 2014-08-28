@@ -29,19 +29,27 @@ def padPeriodic(x,n,offset=0.):
     padded[-nhi:] = x[:nhi] + offset
     return padded
 
-def getBinEdges(binCenters):
+def getBinEdges(*binCenters,**options):
     """
     Returns a numpy array of bin edges corresponding to the input array of bin centers,
     which will have a length one greater than the input length. The outer edges will
-    be the same as the outer bin centers. This function is normally used with the
-    matplotlib pcolormesh function, e.g.
+    be the same as the outer bin centers unless expand=True is passed as a keyword option.
+    This function is normally used with the matplotlib pcolormesh function, e.g.
 
-    ex,ey = getBinEdges(x),getBinEdges(y)
+    ex,ey = getBinEdges(x,y)
     plt.pcolormesh(ex,ey,z,cmap='rainbow')
     plt.contours(x,y,z,levels=(0,1,2),colors='w',linestyles=('-','--',':'))
     """
-    edges = np.empty((len(binCenters)+1,),dtype=binCenters.dtype)
-    edges[1:-1] = 0.5*(binCenters[1:] + binCenters[:-1])
-    edges[0] = binCenters[0]
-    edges[-1] = binCenters[-1]
-    return edges
+    expand = 'expand' in options and options['expand']
+    binEdges = [ ]
+    for centers in binCenters:
+        edges = np.empty((len(centers)+1,),dtype=centers.dtype)
+        edges[1:-1] = 0.5*(centers[1:] + centers[:-1])
+        if expand:
+            edges[0] = 0.5*(3*centers[0] - centers[1])
+            edges[-1] = 0.5*(3*centers[-1] - centers[-2])
+        else:
+            edges[0] = centers[0]
+            edges[-1] = centers[-1]
+        binEdges.append(edges)
+    return binEdges if len(binEdges) > 1 else binEdges[0]

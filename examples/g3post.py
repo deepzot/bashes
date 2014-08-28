@@ -33,7 +33,7 @@ def main():
     g2 = g2_center+dg
 
     # Prepare the shear grid edges needed by pcolormesh.
-    g1e,g2e = bashes.utility.getBinEdges(g1),bashes.utility.getBinEdges(g2)
+    g1e,g2e = bashes.utility.getBinEdges(g1,g2)
 
     # Initialize matplotlib.
     fig = plt.figure('fig1',figsize=(12,9))
