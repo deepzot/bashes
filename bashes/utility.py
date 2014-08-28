@@ -28,3 +28,20 @@ def padPeriodic(x,n,offset=0.):
     padded[nlo:-nhi] = x
     padded[-nhi:] = x[:nhi] + offset
     return padded
+
+def getBinEdges(binCenters):
+    """
+    Returns a numpy array of bin edges corresponding to the input array of bin centers,
+    which will have a length one greater than the input length. The outer edges will
+    be the same as the outer bin centers. This function is normally used with the
+    matplotlib pcolormesh function, e.g.
+
+    ex,ey = getBinEdges(x),getBinEdges(y)
+    plt.pcolormesh(ex,ey,z,cmap='rainbow')
+    plt.contours(x,y,z,levels=(0,1,2),colors='w',linestyles=('-','--',':'))
+    """
+    edges = np.empty((len(binCenters)+1,),dtype=binCenters.dtype)
+    edges[1:-1] = 0.5*(binCenters[1:] + binCenters[:-1])
+    edges[0] = binCenters[0]
+    edges[-1] = binCenters[-1]
+    return edges

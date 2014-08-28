@@ -33,14 +33,7 @@ def main():
     g2 = g2_center+dg
 
     # Prepare the shear grid edges needed by pcolormesh.
-    g1edges = np.empty((ng+1,))
-    g2edges = np.empty((ng+1,))
-    g1edges[1:-1] = 0.5*(g1[1:] + g1[:-1])
-    g2edges[1:-1] = 0.5*(g2[1:] + g2[:-1])
-    g1edges[0] = g1[0]
-    g1edges[-1] = g1[-1]
-    g2edges[0] = g2[0]
-    g2edges[-1] = g2[-1]
+    g1e,g2e = bashes.utility.getBinEdges(g1),bashes.utility.getBinEdges(g2)
 
     # Initialize matplotlib.
     fig = plt.figure('fig1',figsize=(12,9))
@@ -60,7 +53,7 @@ def main():
         ndata = nll.shape[0]
         for idata in range(nstamps):
             print 'prior %d, stamp %d' % (iprior,idata)
-            plt.pcolormesh(g1edges,g2edges,nll[:,idata].reshape((ng,ng))-nllMin,cmap='rainbow')
+            plt.pcolormesh(g1e,g2e,nll[:,idata].reshape((ng,ng))-nllMin,cmap='rainbow')
             plt.show()
 
 if __name__ == '__main__':
