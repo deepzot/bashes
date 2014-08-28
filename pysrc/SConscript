@@ -1,0 +1,38 @@
+# SConscript is python -*-Python-*-
+
+import os
+import distutils.sysconfig
+
+Import('env')
+
+pyenv = env.Clone()
+
+# build object files in hidden sub directory
+pyenv['OBJPREFIX'] = '.obj/'
+
+# python include path
+pyIncDir = distutils.sysconfig.get_python_inc()
+pyenv.AppendUnique(CPPPATH=[pyIncDir])
+# python lib path
+pyLibDir = os.path.split(os.path.split(distutils.sysconfig.get_python_lib())[0])[0]
+pyenv.AppendUnique(LIBPATH=[pyLibDir])
+# python library
+pylib = 'python'+distutils.sysconfig.get_python_version()
+
+import numpy
+npInc = numpy.get_include()
+pyenv.AppendUnique(CPPPATH=[npInc])
+
+# bashes C++ library
+pyenv.AppendUnique(LIBPATH=['#lib'])
+
+# build module
+sharedObj = pyenv.SharedObject([
+	'module.cc',
+	'EstimatorEngine.cc',
+	'EstimatorHelpers.cc'
+	])
+
+pyenv.LoadableModule(os.path.join('#bashes','_bashes'), sharedObj,
+	LDMODULEPREFIX='', LDMODULESUFFIX='.so',
+	LIBS=['boost_python',pylib,'bashes'])
