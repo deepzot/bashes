@@ -110,8 +110,8 @@ class Estimator(object):
         # Initialize our (g1,g2) grid.
         dg = np.linspace(-gmax,+gmax,ng)
         g1,g2 = np.meshgrid(g1_center+dg,g2_center+dg)
-        self.g1vec = g1.flat
-        self.g2vec = g2.flat
+        self.g1vec = g1.flatten()
+        self.g2vec = g2.flatten()
         self.nshear = len(self.g1vec)
 
         # Initialize float32 storage for the feature values we will calculate in parallel.

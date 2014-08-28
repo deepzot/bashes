@@ -63,7 +63,7 @@ def main():
     print 'Galaxy SNR =',truth['gal_sn']
 
     # Estimator uses a single shear value given by the true shear plus some offset.
-    args.nshear = 1
+    args.ng = 1
     args.g1_center = truth['g1'] + args.dg1
     args.g2_center = truth['g2'] + args.dg2
 
