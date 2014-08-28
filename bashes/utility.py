@@ -1,4 +1,5 @@
 import numpy as np
+import scipy.stats
 import galsim
 
 def render(model,scale,size=None,stamp=None):
@@ -29,6 +30,14 @@ def padPeriodic(x,n,offset=0.):
     padded[-nhi:] = x[:nhi] + offset
     return padded
 
+def getDeltaChiSq(CL=(0.6827,0.9543,0.9973),dof=2):
+    """
+    Returns a numpy array of delta(chisq) values corresponding to the specified list of
+    confidence levels. The default CL values correspond to the enclosed probabilities
+    of 1,2,3-sigmas for a 1D Gaussian pdf.
+    """
+    return scipy.stats.chi2.isf(1-np.array(CL),df=dof)
+
 def getBinEdges(*binCenters,**options):
     """
     Returns a numpy array of bin edges corresponding to the input array of bin centers,
@@ -38,7 +47,8 @@ def getBinEdges(*binCenters,**options):
 
     ex,ey = getBinEdges(x,y)
     plt.pcolormesh(ex,ey,z,cmap='rainbow')
-    plt.contours(x,y,z,levels=(0,1,2),colors='w',linestyles=('-','--',':'))
+    levels = np.min(z) + getDeltaChiSq(dof=2)
+    plt.contour(x,y,z,levels=levels,colors='w',linestyles=('-','--',':'))
     """
     expand = 'expand' in options and options['expand']
     binEdges = [ ]

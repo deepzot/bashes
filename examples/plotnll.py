@@ -5,7 +5,6 @@
 import argparse
 
 import numpy as np
-import scipy.stats
 
 import matplotlib.pyplot as plt
 
@@ -96,9 +95,8 @@ def main():
     # Lookup the true centroid shift.
     dx = truth['xshift']
     dy = truth['yshift']
-    # Initialize contour levels relative to the global minimum NLL.
-    nllProb = np.array((0.6827,0.9543,0.9973))
-    nllDeltaChi2 = scipy.stats.chi2.isf(1-nllProb,df=3)
+    # Initialize 1,2,3-sigma contour levels relative to the global minimum NLL.
+    nllDeltaChi2 = bashes.utility.getDeltaChiSq(dof=3)
     # Loop over theta values.
     for ith in range(args.ntheta):
         # Plot NLL(x,y,theta) vs (x,y) at this theta.
