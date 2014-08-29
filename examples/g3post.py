@@ -41,31 +41,53 @@ def main():
         gridFig.set_facecolor('white')
         plt.subplots_adjust(left=0.02,bottom=0.02,right=0.98,top=0.98,wspace=0.05,hspace=0.05)
 
-    # Loop over priors.
+    # Allocate memory for the full NLL grid over all priors.
     nstamps = config['args']['nstamps']
+    nll = np.empty((ng*ng,nstamps,nstamps))
+
+    # Load this array from the NLL grids saved for each prior.
     for iprior in range(nstamps):
         # Load the estimator results for this prior.
         loadName = '%s_%d.npy' % (saveBase,iprior)
         if not os.path.exists(loadName):
             print 'Skipping missing results for prior %d in %r' % (i,loadName)
             continue
-        nll = np.load(loadName)
-        nllMin = np.min(nll)
+        nll[:,:,iprior] = np.load(loadName)
+
+    # Marginalize over priors for each data stamp.
+    nllData = np.empty((ng*ng,nstamps))
+    for idata in range(nstamps):
+        for ig in range(ng*ng):
+            nllData[ig,idata] = bashes.Estimator.marginalize(nll[ig,idata])
+
+    # Draw a grid of shear NLL values if requested.
+    if args.grid:
+        nllMin = np.min(nll,axis=(0,1))
         nllLevels = bashes.utility.getDeltaChiSq()
-        assert nll.shape[0] == ng*ng
-        ndata = nll.shape[1]
-        for idata in range(ndata):
-            nllShear = nll[:,idata].reshape((ng,ng))-nllMin
-            print 'prior %d, stamp %d, nllMin = %f (%f)' % (iprior,idata,np.min(nllShear),nllMin)
-            if args.grid and iprior < args.grid and idata < args.grid:
-                plt.subplot(args.grid,args.grid,iprior*args.grid+idata+1)
+        for iprior in range(args.grid):
+            for idata in range(args.grid):
+                nllShear = nll[:,idata,iprior].reshape((ng,ng))
+                nllShearMin = np.min(nllShear)
+                print 'prior %d, stamp %d, nllMin = %f (%f)' % (iprior,idata,nllShearMin,nllMin[iprior])
+                plt.subplot(args.grid+1,args.grid+1,iprior*(args.grid+1)+idata+1)
                 plt.pcolormesh(g1e,g2e,nllShear,cmap='rainbow')
-                plt.contour(g1,g2,nllShear,levels=nllLevels,colors='w',linestyles=('-','--',':'))
+                plt.contour(g1,g2,nllShear,levels=nllShearMin+nllLevels,colors='w',linestyles=('-','--',':'))
                 # Remove tick labels.
                 axes = plt.gca()
                 axes.xaxis.set_ticklabels([])
                 axes.yaxis.set_ticklabels([])
-    plt.show()
+        # Show the shear grid marginalized over priors for each data stamp.
+        for idata in range(args.grid):
+            nllShear = nllData[:,idata].reshape((ng,ng))
+            nllShearMin = np.min(nllShear)
+            plt.subplot(args.grid+1,args.grid+1,args.grid*(args.grid+1)+idata+1)
+            plt.pcolormesh(g1e,g2e,nllShear,cmap='rainbow')
+            plt.contour(g1,g2,nllShear,levels=nllShearMin+nllLevels,colors='w',linestyles=('-','--',':'))
+            # Remove tick labels.
+            axes = plt.gca()
+            axes.xaxis.set_ticklabels([])
+            axes.yaxis.set_ticklabels([])
+        plt.show()
 
 if __name__ == '__main__':
     main()
