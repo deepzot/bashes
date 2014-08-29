@@ -72,9 +72,12 @@ def getFeatures(image, psfModel, sigma):
     # Build moment matrix
     moments = [np.ones((stampSize,stampSize)), 1J*kx, 1J*ky, ksq, kxsq - kysq, 2*kx*ky]
     M = np.array([x.flatten() for x in moments])
-        
-    # Return features
-    return M.dot(ftdeconvolved.flatten())
+
+    # Integral over ksq is essentially just a dot product between the moment matrix
+    # and the deconvolved image
+    dk = kx[0,0]-kx[0,1]
+    dksq = dk*dk
+    return dksq*M.dot(ftdeconvolved.flatten())
 
 def main():
 
