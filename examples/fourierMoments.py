@@ -18,26 +18,22 @@ def fourierMatrix(n):
     omega = np.exp(-2*np.pi*1J/n)
     return np.power(omega, A+B)
 
-def getTSquare(psf):
+def circularize(t):
     """
-    Returns the azimuthally averaged square of the fourier transformed psf. 
+    Returns the azimuthally average of the provided 2d matrix. 
     """
     import scipy.ndimage
     import scipy.interpolate
-    # fourier transform and shift
-    t = np.fft.fftshift(np.fft.fft2(psf.array))
-    tSq = (np.conjugate(t)*t).real
     # average over theta
-    sx, sy = tSq.shape
+    sx, sy = t.shape
     X, Y = np.ogrid[0:sx, 0:sy]
     r = np.hypot(X - sx/2 + 0.5, Y - sy/2 + 0.5)
     rbin = r.astype(np.int)
-    tSqAvg = scipy.ndimage.mean(tSq, labels=rbin, index=np.arange(0, rbin.max()+1))
+    tAvg = scipy.ndimage.mean(t, labels=rbin, index=np.arange(0, rbin.max()+1))
     # build 2d representation
-    tSqAvgInterp = scipy.interpolate.InterpolatedUnivariateSpline(np.arange(len(tSqAvg)),tSqAvg)
-    tSq2d = tSqAvgInterp(r.flatten()).reshape(sx,sy)
-    # shift and return
-    return np.fft.fftshift(tSq2d)
+    tAvgInterp = scipy.interpolate.InterpolatedUnivariateSpline(np.arange(len(tAvg)),tAvg)
+    tAvg2d = tAvgInterp(r.flatten()).reshape(sx,sy)
+    return tAvg2d
 
 def getFeatures(image, psfModel, sigma):
     """
@@ -63,8 +59,9 @@ def getFeatures(image, psfModel, sigma):
     # Build weight function
     sigmasqby2 = sigma*sigma/2
     wg = np.exp(-ksq*sigmasqby2)
-    tsq = getTSquare(psf)
-    weight = wg*tsq
+    tSq = (np.conjugate(ftpsf)*ftpsf).real
+    tSqCircle = np.fft.fftshift(circularize(np.fft.fftshift(tSq)))
+    weight = wg*tSqCircle
     
     # Deconvolve image
     ftdeconvolved = ftimage / ftpsf * weight
