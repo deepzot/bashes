@@ -41,6 +41,18 @@ def main():
         gridFig.set_facecolor('white')
         plt.subplots_adjust(left=0.02,bottom=0.02,right=0.98,top=0.98,wspace=0.05,hspace=0.05)
 
+    # Define a shear plot helper.
+    nllLevels = bashes.utility.getDeltaChiSq()
+    def plotShearNLL(nll):
+        nllShear = nll.reshape((ng,ng))
+        nllShearMin = np.min(nllShear)
+        plt.pcolormesh(g1e,g2e,nllShear,cmap='rainbow')
+        plt.contour(g1,g2,nllShear,levels=nllShearMin+nllLevels,colors='w',linestyles=('-','--',':'))
+        # Remove tick labels.
+        axes = plt.gca()
+        axes.xaxis.set_ticklabels([])
+        axes.yaxis.set_ticklabels([])
+
     # Allocate memory for the full NLL grid over all priors.
     nstamps = config['args']['nstamps']
     nll = np.empty((ng*ng,nstamps,nstamps))
@@ -60,33 +72,23 @@ def main():
         for ig in range(ng*ng):
             nllData[ig,idata] = bashes.Estimator.marginalize(nll[ig,idata])
 
+    # Sum the NLL over data stamps, assuming that the same constant shear is applied.
+    nllTotal = np.sum(nllData,axis=1)
+
     # Draw a grid of shear NLL values if requested.
     if args.grid:
-        nllMin = np.min(nll,axis=(0,1))
-        nllLevels = bashes.utility.getDeltaChiSq()
+        # Show the shear grid for each stamp,prior pair.
         for iprior in range(args.grid):
             for idata in range(args.grid):
-                nllShear = nll[:,idata,iprior].reshape((ng,ng))
-                nllShearMin = np.min(nllShear)
-                print 'prior %d, stamp %d, nllMin = %f (%f)' % (iprior,idata,nllShearMin,nllMin[iprior])
                 plt.subplot(args.grid+1,args.grid+1,iprior*(args.grid+1)+idata+1)
-                plt.pcolormesh(g1e,g2e,nllShear,cmap='rainbow')
-                plt.contour(g1,g2,nllShear,levels=nllShearMin+nllLevels,colors='w',linestyles=('-','--',':'))
-                # Remove tick labels.
-                axes = plt.gca()
-                axes.xaxis.set_ticklabels([])
-                axes.yaxis.set_ticklabels([])
+                plotShearNLL(nll[:,idata,iprior])
         # Show the shear grid marginalized over priors for each data stamp.
         for idata in range(args.grid):
-            nllShear = nllData[:,idata].reshape((ng,ng))
-            nllShearMin = np.min(nllShear)
             plt.subplot(args.grid+1,args.grid+1,args.grid*(args.grid+1)+idata+1)
-            plt.pcolormesh(g1e,g2e,nllShear,cmap='rainbow')
-            plt.contour(g1,g2,nllShear,levels=nllShearMin+nllLevels,colors='w',linestyles=('-','--',':'))
-            # Remove tick labels.
-            axes = plt.gca()
-            axes.xaxis.set_ticklabels([])
-            axes.yaxis.set_ticklabels([])
+            plotShearNLL(nllData[:,idata])
+        # Show the combined NLL assuming constant shear.
+        plt.subplot(args.grid+1,args.grid+1,(args.grid+1)**2)
+        plotShearNLL(nllTotal)
         plt.show()
 
 if __name__ == '__main__':
