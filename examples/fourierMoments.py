@@ -21,16 +21,17 @@ def getFeatures(image, psfModel, sigma):
         
     # build weight function
     kx,ky = np.meshgrid(np.fft.fftfreq(stampSize),np.fft.fftfreq(stampSize))
+    kxsq = kx*kx
+    kysq = ky*ky
+    ksq = kxsq + kysq
     sigmasqby2 = sigma*sigma/2
-    weight = np.exp(-kx*ky*sigmasqby2)    
+    weight = np.exp(-ksq*sigmasqby2)    
     
     # deconvolve image
     ftdeconvolved = ftimage / ftpsf * weight
 
     # build moment matrix
-    kxsq = kx*kx
-    kysq = ky*ky
-    moments = [np.ones((stampSize,stampSize)), 1J*kx, 1J*ky, kxsq + kysq, kxsq - kysq, 2*kx*ky]
+    moments = [np.ones((stampSize,stampSize)), 1J*kx, 1J*ky, ksq, kxsq - kysq, 2*kx*ky]
     M = np.array([x.flatten() for x in moments])
         
     # return features
