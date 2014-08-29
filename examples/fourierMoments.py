@@ -8,33 +8,60 @@ import numpy as np
 import galsim
 import bashes
 
+import scipy.ndimage
+import scipy.interpolate
+
+def getTSquare(psf):
+    # fourier transform and shift
+    t = np.fft.fftshift(np.fft.fft2(psf.array))
+    tSq = (np.conjugate(t)*t).real
+    # average over theta
+    sx, sy = tSq.shape
+    X, Y = np.ogrid[0:sx, 0:sy]
+    r = np.hypot(X - sx/2 + 0.5, Y - sy/2 + 0.5)
+    rbin = r.astype(np.int)
+    tSqAvg = scipy.ndimage.mean(tSq, labels=rbin, index=np.arange(0, rbin.max()+1))
+    # build 2d representation
+    tSqAvgInterp = scipy.interpolate.InterpolatedUnivariateSpline(np.arange(len(tSqAvg)),tSqAvg)
+    tSq2d = tSqAvgInterp(r.flatten()).reshape(sx,sy)
+    # shift and return
+    return np.fft.fftshift(tSq2d)
+
 def getFeatures(image, psfModel, sigma):
+    """
+    Returns Fourier moment features of the provided image.
+    """
+    # Get stamp size/scale
     stampSize = image.xmax - image.xmin + 1
     pixelScale = image.scale
 
-    # fourier transform image
+    # Fourier transform image
     ftimage = np.fft.fft2(image.array)
 
-    # render psf and fourier transform
+    # Render psf and fourier transform
     psf = bashes.utility.render(psfModel,scale=pixelScale,size=stampSize)
     ftpsf = np.fft.fft2(psf.array)
         
-    # build weight function
+    # k grid
     kx,ky = np.meshgrid(np.fft.fftfreq(stampSize),np.fft.fftfreq(stampSize))
     kxsq = kx*kx
     kysq = ky*ky
     ksq = kxsq + kysq
+
+    # Build weight function
     sigmasqby2 = sigma*sigma/2
-    weight = np.exp(-ksq*sigmasqby2)    
+    wg = np.exp(-ksq*sigmasqby2)
+    tsq = getTSquare(psf)
+    weight = wg*tsq
     
-    # deconvolve image
+    # Deconvolve image
     ftdeconvolved = ftimage / ftpsf * weight
 
-    # build moment matrix
+    # Build moment matrix
     moments = [np.ones((stampSize,stampSize)), 1J*kx, 1J*ky, ksq, kxsq - kysq, 2*kx*ky]
     M = np.array([x.flatten() for x in moments])
         
-    # return features
+    # Return features
     return M.dot(ftdeconvolved.flatten())
 
 def main():
