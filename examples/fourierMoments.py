@@ -8,10 +8,22 @@ import numpy as np
 import galsim
 import bashes
 
-import scipy.ndimage
-import scipy.interpolate
+def fourierMatrix(n):
+    """
+    Returns the fourier transform matrix for a square 2d matrix of size n.
+    """
+    i,j = np.meshgrid(np.arange(n), np.arange(n))
+    A = np.multiply.outer(i.flatten(), i.flatten())
+    B = np.multiply.outer(j.flatten(), j.flatten())
+    omega = np.exp(-2*np.pi*1J/n)
+    return np.power(omega, A+B)
 
 def getTSquare(psf):
+    """
+    Returns the azimuthally averaged square of the fourier transformed psf. 
+    """
+    import scipy.ndimage
+    import scipy.interpolate
     # fourier transform and shift
     t = np.fft.fftshift(np.fft.fft2(psf.array))
     tSq = (np.conjugate(t)*t).real
@@ -29,7 +41,7 @@ def getTSquare(psf):
 
 def getFeatures(image, psfModel, sigma):
     """
-    Returns Fourier moment features of the provided image.
+    Returns the Fourier moment features of the provided image.
     """
     # Get stamp size/scale
     stampSize = image.xmax - image.xmin + 1
@@ -85,8 +97,17 @@ def main():
 
     features = getFeatures(image=data,psfModel=psfModel,sigma=args.sigma)
 
-    print features
+    print '%10s %12s %12s' % ('feature', 'real', 'imag')
 
+    def printFeature(label, feature):
+        print '%10s %12.6g %12.6g' % (label, feature.real, feature.imag)
+
+    printFeature('M_I', features[0])
+    printFeature('M_x', features[1])
+    printFeature('M_y', features[2])
+    printFeature('M_r', features[3])
+    printFeature('M_+', features[4])
+    printFeature('M_x', features[5])
 
 if __name__ == '__main__':
     main()
