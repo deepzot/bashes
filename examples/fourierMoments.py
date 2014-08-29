@@ -8,24 +8,30 @@ import numpy as np
 import galsim
 import bashes
 
-def getFeatures(image, psf, stampSize, weight=None):
-    
-    # fourier transform image
-    ftimage = np.fft.fft2(image)
-    ftpsf = np.fft.fft2(psf)
+def getFeatures(image, psfModel, sigma):
+    stampSize = image.xmax - image.xmin + 1
+    pixelScale = image.scale
 
-    if weight is None:
-        weight = np.ones((stampSize,stampSize))
-    
-    ftdeconvolved = ftimage / ftpsf * weight
+    # fourier transform image
+    ftimage = np.fft.fft2(image.array)
+
+    # render psf and fourier transform
+    psf = bashes.utility.render(psfModel,scale=pixelScale,size=stampSize)
+    ftpsf = np.fft.fft2(psf.array)
         
-    # build moment matrix
+    # build weight function
     kx,ky = np.meshgrid(np.fft.fftfreq(stampSize),np.fft.fftfreq(stampSize))
-    kx = kx.flatten()
-    ky = ky.flatten()
+    sigmasqby2 = sigma*sigma/2
+    weight = np.exp(-kx*ky*sigmasqby2)    
+    
+    # deconvolve image
+    ftdeconvolved = ftimage / ftpsf * weight
+
+    # build moment matrix
     kxsq = kx*kx
     kysq = ky*ky
-    M = np.array([np.ones(stampSize*stampSize), 1J*kx, 1J*ky, kxsq + kysq, kxsq - kysq, 2*kx*ky])
+    moments = [np.ones((stampSize,stampSize)), 1J*kx, 1J*ky, kxsq + kysq, kxsq - kysq, 2*kx*ky]
+    M = np.array([x.flatten() for x in moments])
         
     # return features
     return M.dot(ftdeconvolved.flatten())
@@ -34,6 +40,8 @@ def main():
 
     # Parse command-line args.
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('--sigma', type = float, default = 1.,
+            help = 'Weight function size')
     bashes.great3.Observation.addArgs(parser)
     args = parser.parse_args()
 
@@ -44,11 +52,10 @@ def main():
     dataStamps = obs.getImage()
     data = dataStamps.getStamp(0,0)
 
-    # Load the constant PSF stamp to use for the analysis.
-    psfStamps = obs.getStars()
-    psf = psfStamps.getStamp(0,0)
+    # Load the constant PSF stamp to use for the analysis.    
+    psfModel = obs.createPSF(0)
 
-    features = getFeatures(data.array,psf.array,stampSize=obs.stampSize)
+    features = getFeatures(image=data,psfModel=psfModel,sigma=args.sigma)
 
     print features
 
