@@ -219,14 +219,14 @@ class Estimator(object):
                 self.nll[ig,idata] = Estimator.marginalize(nllFine)
 
     @staticmethod
-    def marginalize(nllFine):
+    def marginalize(nll):
         """
         Returns an estimate of the -log of the integral of exp(-nll) using the provided
         values of nll tabulated on a uniform grid over the integration domain.
         """
-        nllMin = np.min(nllFine)
-        expSum = np.sum(np.exp(nllMin - nllFine))
-        return nllMin - np.log(expSum/np.size(nllFine))
+        nllMin = np.min(nll)
+        expSum = np.sum(np.exp(nllMin - nll))
+        return nllMin - np.log(expSum/np.size(nll))
 
     def getNllXYFine(self,ith,ig,idata):
         """
