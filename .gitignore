@@ -24,6 +24,9 @@
 __pycache__/
 *.py[cod]
 
+# Archives
+*.tgz
+
 # Sconstruct temporary files
 .sconsign.dblite
 .sconf_temp
