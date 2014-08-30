@@ -4,3 +4,4 @@ import tiled
 import great3
 import utility
 import display
+import config

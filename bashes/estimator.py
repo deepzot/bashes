@@ -15,7 +15,7 @@ class Estimator(object):
         stampSize,pixelScale,
         ntheta,nxy,xymax,
         xy_oversampling,theta_oversampling,
-        nshear,gmax,g1_center,g2_center,
+        ng,gmax,g1_center,g2_center,
         featureMatrix = None):
 
         self.stampSize = stampSize
@@ -51,19 +51,27 @@ class Estimator(object):
                     self.data[iy*nx+ix] = features
         else:
             # Handle a 3D array of data stamps...
-            assert False,'3D data array not supported yet'
+            assert data.shape[1] == stampSize and data.shape[2] == stampSize, (
+                'Input data has unexpected stamp size')
+            self.ndata = data.shape[0]
+            self.data = np.empty((self.ndata,self.nfeatures))
+            for i in range(self.ndata):
+                pixels = data[i].flat
+                if self.featureMatrix:
+                    features = self.featureMatrix.dot(pixels)
+                else:
+                    features = pixels
+                self.data[i] = features
 
-        # Save the PSF image for each stamp.
-        if isinstance(psfs,galsim.GSObject):
-            self.psfIsConstant = True
+        # Save the PSF model for each stamp. For now we assume that psfs is an
+        # iterable collection of galsim.GSObject models.
+        try:
+            assert len(psfs) == self.ndata, 'Expected same number of stamps and PSFs'
+            for i,psf in enumerate(psfs):
+                assert isinstance(psf,galsim.GSObject), 'PSF[%d] is not a GSObject' % i
             self.psfs = psfs
-        elif psfs.shape == (self.stampSize,self.stampSize):
-            self.psfIsConstant = True
-            self.psfs = psfs
-        else:
-            self.psfIsConstant = False
-            # Handle a 3D or 2D array of PSF stamps...
-            assert False,'Non-constant PSFs not supported yet'
+        except TypeError:
+            raise RuntimeError('PSFs are not iterable')
 
         # Save the inverse variance vector for each stamp.
         try:
@@ -75,6 +83,8 @@ class Estimator(object):
         # Precompute and save Dt.Cinv.D for each stamp
         D = self.data.reshape((self.ndata,self.nfeatures))
         self.DtCinvD = self.ivar*np.einsum('ce,ce->c',D,D)
+        # Reshape for broadcasting over MtCinvM.
+        self.DtCinvD = self.DtCinvD.reshape((1,1,self.ndata,1))
 
         # Initialize our coarse theta grid in degrees. We do not include the endpoint
         # because of the assumed periodicity.
@@ -98,19 +108,19 @@ class Estimator(object):
         self.xyFine = np.linspace(-xymax + 0.5*dxyFine,+xymax - 0.5*dxyFine,nxyFine)
 
         # Initialize our (g1,g2) grid.
-        self.nshear = nshear
-        dg = np.linspace(-gmax,+gmax,nshear)
-        self.g1,self.g2 = np.meshgrid(g1_center+dg,g2_center+dg)
+        dg = np.linspace(-gmax,+gmax,ng)
+        g1,g2 = np.meshgrid(g1_center+dg,g2_center+dg)
+        self.g1vec = g1.flatten()
+        self.g2vec = g2.flatten()
+        self.nshear = len(self.g1vec)
 
         # Initialize float32 storage for the feature values we will calculate in parallel.
-        assert self.ndata == 1,'ndata > 1 not supported yet'
-        self.M = np.empty((self.ntheta,self.nshear**2,self.ndata,self.nxy**2,self.nfeatures),
+        self.M = np.empty((self.ntheta,self.nshear,self.ndata,self.nxy**2,self.nfeatures),
             dtype=np.float32)
         # Initialize storage for marginalized NLL arrays.
         self.nllTheta = np.empty((self.ntheta,self.nshear,self.ndata))
         self.nll = np.empty((self.nshear,self.ndata))
-        print 'allocated %ld (M) + %ld (nllTheta) bytes' % (
-            self.M.nbytes,self.nllTheta.nbytes)
+        print 'allocated %ld bytes for M' % self.M.nbytes
 
     @staticmethod
     def addArgs(parser):
@@ -127,8 +137,8 @@ class Estimator(object):
             help = 'Amount of interpolated oversampling to use in x,y (1 = none)')
         parser.add_argument('--theta-oversampling', type = int, default = 32,
             help = 'Amount of interpolated oversampling to use in theta (1 = none)')
-        parser.add_argument('--nshear', type = int, default = 5,
-            help = 'Number of reduced shear values for sampling the likelihood')
+        parser.add_argument('--ng', type = int, default = 5,
+            help = 'Number of g1,g2 values for sampling the likelihood')
         parser.add_argument('--gmax', type = float, default = 0.06,
             help = 'Range of reduced shear for sampling the likelihood')
         parser.add_argument('--g1-center', type = float, default = 0.,
@@ -148,29 +158,30 @@ class Estimator(object):
         # Return a dictionary of constructor parameters provided in args.
         return { key:argsDict[key] for key in (set(pnames) & set(argsDict)) }
 
-    def usePrior(self,sourceModel,fluxSigmaFraction,weight=1.):
+    def usePrior(self,sourceModel,fluxSigmaFraction,weight=1.,traceMsg=None):
         # Loop over rotations.
         for ith,theta in enumerate(self.thetaGrid):
             # Loop over shears.
-            for ig,(g1,g2) in enumerate(zip(self.g1.flat,self.g2.flat)):
-                print (ith,ig)
+            for ig,(g1,g2) in enumerate(zip(self.g1vec,self.g2vec)):
+                if traceMsg:
+                    print traceMsg % (ith,ig)
                 # Apply rotation and shear transforms.
                 transformed = sourceModel.rotate(theta*galsim.degrees).shear(g1=g1,g2=g2)
-                # Loop over PSF models (assuming we have a single PSF model for now)
-                idata = 0
-                convolved = galsim.Convolve(transformed,self.psfs)
-                # Loop over x,y shifts.
-                for iy,dy in enumerate(self.xyGrid):
-                    for ix,dx in enumerate(self.xyGrid):
-                        ixy = iy*self.nxy + ix
-                        model = convolved.shift(dx=dx*self.pixelScale,dy=dy*self.pixelScale)
-                        # Render the fully-specified model.
-                        pixels = bashes.utility.render(model,scale=self.pixelScale,size=self.stampSize)
-                        if self.featureMatrix:
-                            features = self.featureMatrix.dot(pixels.array.flat)
-                        else:
-                            features = pixels.array.flat
-                        self.M[ith,ig,idata,ixy] = features
+                # Loop over PSF models for each data stamp.
+                for idata,psf in enumerate(self.psfs):
+                    convolved = galsim.Convolve(transformed,self.psfs[idata])
+                    # Loop over x,y shifts.
+                    for iy,dy in enumerate(self.xyGrid):
+                        for ix,dx in enumerate(self.xyGrid):
+                            ixy = iy*self.nxy + ix
+                            model = convolved.shift(dx=dx*self.pixelScale,dy=dy*self.pixelScale)
+                            # Render the fully-specified model.
+                            pixels = bashes.utility.render(model,scale=self.pixelScale,size=self.stampSize)
+                            if self.featureMatrix:
+                                features = self.featureMatrix.dot(pixels.array.flat)
+                            else:
+                                features = pixels.array.flat
+                            self.M[ith,ig,idata,ixy] = features
         # Calculate Mt.Cinv.M
         MtCinvM = self.ivar*np.einsum('abcde,abcde->abcd',self.M,self.M)
         # Calculate Dt.Cinv.M
@@ -194,7 +205,7 @@ class Estimator(object):
         # Calculate the negative log of the flux-integrated likelihood
         self.nllXYTheta = psi - np.log(Gamma)
         # Loop over shears and data stamps to perform marginalization integrals.
-        for ig in range(len(self.g1)):
+        for ig in range(self.nshear):
             for idata in range(self.ndata):
                 # Marginalize nll(x,y,theta) over (x,y) for each theta.
                 for ith in range(self.ntheta):
@@ -208,14 +219,14 @@ class Estimator(object):
                 self.nll[ig,idata] = Estimator.marginalize(nllFine)
 
     @staticmethod
-    def marginalize(nllFine):
+    def marginalize(nll):
         """
         Returns an estimate of the -log of the integral of exp(-nll) using the provided
         values of nll tabulated on a uniform grid over the integration domain.
         """
-        nllMin = np.min(nllFine)
-        expSum = np.sum(np.exp(nllMin - nllFine))
-        return nllMin - np.log(expSum/np.size(nllFine))
+        nllMin = np.min(nll)
+        expSum = np.sum(np.exp(nllMin - nll))
+        return nllMin - np.log(expSum/np.size(nll))
 
     def getNllXYFine(self,ith,ig,idata):
         """
