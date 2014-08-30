@@ -19,6 +19,8 @@ def main():
         help = 'number of stamp/prior combinations to show as a grid of plots')
     parser.add_argument('--verbose', action = 'store_true',
         help = 'be verbose about progress')
+    parser.add_argument('--save', type = str, default = None,
+        help = 'base name for saving ouput')
     args = parser.parse_args()
 
     # Load the config data for the g3bashes job we are post processing.
@@ -89,6 +91,8 @@ def main():
         # Show the combined NLL assuming constant shear.
         plt.subplot(args.grid+1,args.grid+1,(args.grid+1)**2)
         plotShearNLL(nllTotal)
+        if args.save:
+            plt.savefig(args.save)
         plt.show()
 
 if __name__ == '__main__':

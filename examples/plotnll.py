@@ -135,6 +135,8 @@ def main():
     # Draw a marker at the true value.
     plt.ylim((0.,1.05))
     ax2.plot(args.rotate,0.15,'r*',markersize=15)
+    if args.save:
+        plt.savefig(args.save + '.pdf')
     plt.show()
 
 if __name__ == '__main__':
