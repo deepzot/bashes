@@ -1,3 +1,4 @@
+import abc 
 import numpy as np
 import bashes
 
@@ -29,16 +30,31 @@ def circularize(image):
     avg2d = avgInterp(r.flatten()).reshape(sx,sy)
     return avg2d
 
-class FeatureCalculator(object):
+class AbsFeatureCalculator(object):
     """
-    Feature calculator abstract base class
+    Feature calculator abstract base class.
+
+    Attributes:
+        nfeatures (int): The number of features to calculate.
+
+    Args:
+        nfeatures (int): The number of features to calculate.
     """
     def __init__(self, nfeatures):
         self.nfeatures = nfeatures
-    def getFeatures(self, image, psf):
-        pass
 
-class FourierMoments(FeatureCalculator):
+    @abc.abstractmethod
+    def getFeatures(self, image, psf):
+        """
+        Returns a flat array of features that are linearly related to image pixels (given the psf).
+
+        Args:
+            image (np.ndarray): A 2D np array of image pixel values.
+            psf (galsim.GSObject): The psf model for the corresponding image.
+        """
+
+
+class FourierMoments(AbsFeatureCalculator):
     """
     Calculates fourier domain moment features
     """
