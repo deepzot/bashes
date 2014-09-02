@@ -3,7 +3,7 @@ import os
 import distutils.sysconfig
 
 # initialize our build enviroment
-env = Environment(CPPPATH=['#include'],LIBPATH=[],CPPDEFINES=[])
+env = Environment(CPPPATH=['#include'],LIBPATH=[],CPPDEFINES={})
 
 # take PATH and LD_LIBRARY_PATH from the environment so currently configured
 # build tools are used
