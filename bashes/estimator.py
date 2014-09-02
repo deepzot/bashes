@@ -22,7 +22,7 @@ class Estimator(object):
         self.pixelScale = pixelScale
         self.nPixels = stampSize**2
         if featureCalculator is None:
-            self.featureCalculator = bashes.PixelFeatures(stampSize)
+            self.featureCalculator = bashes.features.PixelFeatures(stampSize)
         else:
             self.featureCalculator = featureCalculator
 
