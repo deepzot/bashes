@@ -8,6 +8,9 @@ import scipy.interpolate
 def fourierMatrix(n):
     """
     Returns the fourier transform matrix for a square 2d matrix of size n.
+
+    Args:
+        n (int): Square image size.
     """
     i,j = np.meshgrid(np.arange(n), np.arange(n))
     A = np.multiply.outer(i.flatten(), i.flatten())
@@ -18,6 +21,9 @@ def fourierMatrix(n):
 def circularize(image):
     """
     Returns the azimuthally averaged 2d image about the center. 
+
+    Args:
+        image (np.ndarray): Square 2D image.
     """
     # average over theta
     sx, sy = image.shape
@@ -53,12 +59,40 @@ class AbsFeatureCalculator(object):
             psf (galsim.GSObject): The psf model for the corresponding image.
         """
 
+class PixelFeatures(AbsFeatureCalculator):
+    """
+    Simple pixel feature calculator.
+
+    Attributes:
+        nfeatures (int): The total number of pixels.
+
+    Args:
+        stampSize (int): The postage stamp size in pixels.
+    """
+    def __init__(self, stampSize):
+        nfeatures = stampSize*stampSize
+        super(PixelFeatures, self).__init__(nfeatures)
+    def getFeatures(self, image, psf):
+        """
+        Returns a flat array of features that are linearly related to image pixels (given the psf).
+
+        Args:
+            image (np.ndarray): A 2D np array of image pixel values.
+            psf (galsim.GSObject): The psf model for the corresponding image.
+        """
+        return image.flat
 
 class FourierMoments(AbsFeatureCalculator):
     """
-    Calculates fourier domain moment features
+    Calculates fourier domain moment features.
+
+    Args:
+        stampSize (int): The postage stamp size in pixels.
+        pixelScale (int): The postage stamp pixel scale.
+        sigma (float,None): The Gaussian weight function sigma. A value of None 
+            indicates that sigma should be calculated on-the-fly (not supported yet).
     """
-    def __init__(self, stampSize, pixelScale, sigma=None):
+    def __init__(self, stampSize, pixelScale, sigma):
         self.stampSize = stampSize
         self.pixelScale = pixelScale
         self.sigma = sigma
@@ -68,24 +102,34 @@ class FourierMoments(AbsFeatureCalculator):
         dk = kx[0,0]-kx[0,1]
         self.dksq = dk*dk
 
-        # build part of weight function
+        # build Gaussian part of weight function
         kxsq = kx*kx
         kysq = ky*ky
         self.ksq = kxsq + kysq
-        sigmasqby2 = 0.5*sigma*sigma
-        self.wg = np.exp(-self.ksq*sigmasqby2)
+        if sigma is None:
+            assert False,'FourierMoments: Non-constant sigma not supported yet'
+        else:
+            sigmasqby2 = 0.5*sigma*sigma
+            self.wg = np.exp(-self.ksq*sigmasqby2)
 
         # Build moment matrix
         moments = [np.ones((stampSize,stampSize)), 1J*kx, 1J*ky, self.ksq, kxsq - kysq, 2*kx*ky]
         self.M = np.array([m.flatten() for m in moments])
 
-        nfeatures = self.M.shape[0]
+        # The fourier moments are complex numbers in general so multiply by two
+        nfeatures = 2*self.M.shape[0]
         super(FourierMoments, self).__init__(nfeatures)
 
     def getFeatures(self, image, psf):
         """
-        Returns the Fourier moment features of the provided image.
+        Returns a flat array of features that are linearly related to image pixels (given the psf).
+
+        Args:
+            image (np.ndarray): A 2D np array of image pixel values.
+            psf (galsim.GSObject): The psf model for the corresponding image.
         """
+        assert image.shape[0] == self.stampSize and image.shape[1] == self.stampSize, (
+            'Input data has unexpected stamp size')
         # Fourier transform image
         ftimage = np.fft.fft2(image)
 
@@ -110,7 +154,10 @@ class FourierMoments(AbsFeatureCalculator):
 
         # Integral over ksq is essentially just a dot product between the moment matrix
         # and the deconvolved image
-        return self.dksq*self.M.dot(ftdeconvolved.flatten())
+        complexFeatures = self.dksq*self.M.dot(ftdeconvolved.flatten())
+        # split complex numbers and recombine into single list [real0, imag0, real1, imag1, ...]
+        features = [j for i in zip(complexFeatures.real,complexFeatures.imag) for j in i]
+        return features
 
 def main():
     import argparse
@@ -137,17 +184,14 @@ def main():
 
     features = featureCalc.getFeatures(image=data.array,psf=psf)
 
-    print '%10s %12s %12s' % ('feature', 'real', 'imag')
+    print '%10s %12s %12s' % ('feature', 'real', 'imag')        
+    print '%10s %12.6g %12.6g' % ('M_I', features[0], features[1])
+    print '%10s %12.6g %12.6g' % ('M_x', features[2], features[3])
+    print '%10s %12.6g %12.6g' % ('M_y', features[4], features[5])
+    print '%10s %12.6g %12.6g' % ('M_r', features[6], features[7])
+    print '%10s %12.6g %12.6g' % ('M_+', features[8], features[9])
+    print '%10s %12.6g %12.6g' % ('M_x', features[10], features[11])
 
-    def printFeature(label, feature):
-        print '%10s %12.6g %12.6g' % (label, feature.real, feature.imag)
-
-    printFeature('M_I', features[0])
-    printFeature('M_x', features[1])
-    printFeature('M_y', features[2])
-    printFeature('M_r', features[3])
-    printFeature('M_+', features[4])
-    printFeature('M_x', features[5])
 
 if __name__ == '__main__':
     main()
