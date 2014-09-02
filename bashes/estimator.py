@@ -16,18 +16,18 @@ class Estimator(object):
         ntheta,nxy,xymax,
         xy_oversampling,theta_oversampling,
         ng,gmax,g1_center,g2_center,
-        featureMatrix = None):
+        featureCalculator = None):
 
         self.stampSize = stampSize
         self.pixelScale = pixelScale
         self.nPixels = stampSize**2
-        self.featureMatrix = featureMatrix
-        if featureMatrix:
+        self.featureCalculator = featureCalculator
+        if featureCalculator:
             # Check that the shape is compatible with the stamp size.
-            assert featureMatrix.shape[1] == self.nPixels, (
-                'Feature matrix has %d columns but stamps have %d pixels' % (
-                    featureMatrix.shape[1],self.nPixels))
-            self.nfeatures = featureMatrix.shape[0]
+            # assert featureMatrix.shape[1] == self.nPixels, (
+            #     'Feature matrix has %d columns but stamps have %d pixels' % (
+            #         featureMatrix.shape[1],self.nPixels))
+            self.nfeatures = featureCalculator.nfeatures
         else:
             self.nfeatures = self.nPixels
 
@@ -43,11 +43,11 @@ class Estimator(object):
             self.data = np.empty((self.ndata,self.nfeatures))
             for iy in range(ny):
                 for ix in range(nx):
-                    pixels = data[iy*stampSize:(iy+1)*stampSize,ix*stampSize:(ix+1)*stampSize].flat
-                    if self.featureMatrix:
-                        features = self.featureMatrix.dot(pixels)
+                    pixels = data[iy*stampSize:(iy+1)*stampSize,ix*stampSize:(ix+1)*stampSize]
+                    if self.featureCalculator:
+                        features = self.featureCalculator.getFeatures(pixels,psfs[iy*nx+ix])
                     else:
-                        features = pixels
+                        features = pixels.flat
                     self.data[iy*nx+ix] = features
         else:
             # Handle a 3D array of data stamps...
@@ -56,11 +56,11 @@ class Estimator(object):
             self.ndata = data.shape[0]
             self.data = np.empty((self.ndata,self.nfeatures))
             for i in range(self.ndata):
-                pixels = data[i].flat
-                if self.featureMatrix:
-                    features = self.featureMatrix.dot(pixels)
+                pixels = data[i]
+                if self.featureCalculator:
+                    features = self.featureCalculator.getFeatures(pixels,psfs[i])
                 else:
-                    features = pixels
+                    features = pixels.flat
                 self.data[i] = features
 
         # Save the PSF model for each stamp. For now we assume that psfs is an
@@ -177,8 +177,8 @@ class Estimator(object):
                             model = convolved.shift(dx=dx*self.pixelScale,dy=dy*self.pixelScale)
                             # Render the fully-specified model.
                             pixels = bashes.utility.render(model,scale=self.pixelScale,size=self.stampSize)
-                            if self.featureMatrix:
-                                features = self.featureMatrix.dot(pixels.array.flat)
+                            if self.featureCalculator:
+                                features = self.featureCalculator.getFeatures(pixels.array)
                             else:
                                 features = pixels.array.flat
                             self.M[ith,ig,idata,ixy] = features
