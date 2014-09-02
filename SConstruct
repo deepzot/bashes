@@ -3,7 +3,7 @@ import os
 import distutils.sysconfig
 
 # initialize our build enviroment
-env = Environment(CPPPATH=['#include'],LIBPATH=[])
+env = Environment(CPPPATH=['#include'],LIBPATH=[],CPPDEFINES=[])
 
 # take PATH and LD_LIBRARY_PATH from the environment so currently configured
 # build tools are used
@@ -69,6 +69,16 @@ if not conf.CheckCXXHeader('boost/system/error_code.hpp'):
 
 # all done: update the build environment
 env = conf.Finish()
+
+# do we have cuda build tools available?
+if not env.WhereIs('nvcc'):
+   print 'Will not build CUDA support since nvcc not found.'
+else:
+   env.Append(CPPDEFINES={'BUILD_CUDA' : '1'})
+   if 'CUDA_ROOT' in os.environ:
+      cudaRoot = os.environ['CUDA_ROOT']
+      env.AppendUnique(LIBPATH=[cudaRoot+'/lib64'])
+print env['CPPDEFINES']
 
 # build C++ library
 SConscript('src/SConscript', exports='env')
