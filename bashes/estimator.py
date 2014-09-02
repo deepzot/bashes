@@ -29,7 +29,6 @@ class Estimator(object):
         # Save the PSF model for each stamp. For now we assume that psfs is an
         # iterable collection of galsim.GSObject models.
         try:
-            assert len(psfs) == self.ndata, 'Expected same number of stamps and PSFs'
             for i,psf in enumerate(psfs):
                 assert isinstance(psf,galsim.GSObject), 'PSF[%d] is not a GSObject' % i
             self.psfs = psfs
@@ -61,6 +60,8 @@ class Estimator(object):
                 pixels = data[i]
                 features = self.featureCalculator.getFeatures(pixels,psfs[i])
                 self.data[i] = features
+
+        assert len(self.psfs) == self.ndata, 'Expected same number of stamps and PSFs'
 
         # Save the inverse variance vector for each stamp.
         try:
@@ -166,7 +167,7 @@ class Estimator(object):
                             model = convolved.shift(dx=dx*self.pixelScale,dy=dy*self.pixelScale)
                             # Render the fully-specified model.
                             pixels = bashes.utility.render(model,scale=self.pixelScale,size=self.stampSize)
-                            features = self.featureCalculator.getFeatures(pixels.array)
+                            features = self.featureCalculator.getFeatures(pixels.array,psf)
                             self.M[ith,ig,idata,ixy] = features
         # Calculate Mt.Cinv.M
         MtCinvM = self.ivar*np.einsum('abcde,abcde->abcd',self.M,self.M)
