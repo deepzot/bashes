@@ -14,20 +14,20 @@ def fourierMatrix(n):
     omega = np.exp(-2*np.pi*1J/n)
     return np.power(omega, A+B)
 
-def circularize(t):
+def circularize(image):
     """
     Returns the azimuthally averaged 2d image about the center. 
     """
     # average over theta
-    sx, sy = t.shape
+    sx, sy = image.shape
     X, Y = np.ogrid[0:sx, 0:sy]
     r = np.hypot(X - sx/2 + 0.5, Y - sy/2 + 0.5)
     rbin = r.astype(np.int)
-    tAvg = scipy.ndimage.mean(t, labels=rbin, index=np.arange(0, rbin.max()+1))
+    avg = scipy.ndimage.mean(image, labels=rbin, index=np.arange(0, rbin.max()+1))
     # build 2d representation
-    tAvgInterp = scipy.interpolate.InterpolatedUnivariateSpline(np.arange(len(tAvg)),tAvg)
-    tAvg2d = tAvgInterp(r.flatten()).reshape(sx,sy)
-    return tAvg2d
+    avgInterp = scipy.interpolate.InterpolatedUnivariateSpline(np.arange(len(avg)),avg)
+    avg2d = avgInterp(r.flatten()).reshape(sx,sy)
+    return avg2d
 
 class FeatureCalculator(object):
     """
