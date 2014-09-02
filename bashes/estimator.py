@@ -21,15 +21,10 @@ class Estimator(object):
         self.stampSize = stampSize
         self.pixelScale = pixelScale
         self.nPixels = stampSize**2
-        self.featureCalculator = featureCalculator
-        if featureCalculator:
-            # Check that the shape is compatible with the stamp size.
-            # assert featureMatrix.shape[1] == self.nPixels, (
-            #     'Feature matrix has %d columns but stamps have %d pixels' % (
-            #         featureMatrix.shape[1],self.nPixels))
-            self.nfeatures = featureCalculator.nfeatures
+        if featureCalculator is None:
+            self.featureCalculator = bashes.PixelFeatures(stampSize)
         else:
-            self.nfeatures = self.nPixels
+            self.featureCalculator = featureCalculator
 
         # Save the PSF model for each stamp. For now we assume that psfs is an
         # iterable collection of galsim.GSObject models.
@@ -50,27 +45,21 @@ class Estimator(object):
                 'Input data size not a multiple of the stamp size')
             ny,nx = data.shape[0]//stampSize,data.shape[1]//stampSize
             self.ndata = nx*ny
-            self.data = np.empty((self.ndata,self.nfeatures))
+            self.data = np.empty((self.ndata,self.featureCalculator.nfeatures))
             for iy in range(ny):
                 for ix in range(nx):
                     pixels = data[iy*stampSize:(iy+1)*stampSize,ix*stampSize:(ix+1)*stampSize]
-                    if self.featureCalculator:
-                        features = self.featureCalculator.getFeatures(pixels,psfs[iy*nx+ix])
-                    else:
-                        features = pixels.flat
+                    features = self.featureCalculator.getFeatures(pixels,psfs[iy*nx+ix])
                     self.data[iy*nx+ix] = features
         else:
             # Handle a 3D array of data stamps...
             assert data.shape[1] == stampSize and data.shape[2] == stampSize, (
                 'Input data has unexpected stamp size')
             self.ndata = data.shape[0]
-            self.data = np.empty((self.ndata,self.nfeatures))
+            self.data = np.empty((self.ndata,self.featureCalculator.nfeatures))
             for i in range(self.ndata):
                 pixels = data[i]
-                if self.featureCalculator:
-                    features = self.featureCalculator.getFeatures(pixels,psfs[i])
-                else:
-                    features = pixels.flat
+                features = self.featureCalculator.getFeatures(pixels,psfs[i])
                 self.data[i] = features
 
         # Save the inverse variance vector for each stamp.
@@ -81,7 +70,7 @@ class Estimator(object):
             assert False,'Non-constant ivar not supported yet'
 
         # Precompute and save Dt.Cinv.D for each stamp
-        D = self.data.reshape((self.ndata,self.nfeatures))
+        D = self.data.reshape((self.ndata,self.featureCalculator.nfeatures))
         self.DtCinvD = self.ivar*np.einsum('ce,ce->c',D,D)
         # Reshape for broadcasting over MtCinvM.
         self.DtCinvD = self.DtCinvD.reshape((1,1,self.ndata,1))
@@ -115,7 +104,7 @@ class Estimator(object):
         self.nshear = len(self.g1vec)
 
         # Initialize float32 storage for the feature values we will calculate in parallel.
-        self.M = np.empty((self.ntheta,self.nshear,self.ndata,self.nxy**2,self.nfeatures),
+        self.M = np.empty((self.ntheta,self.nshear,self.ndata,self.nxy**2,self.featureCalculator.nfeatures),
             dtype=np.float32)
         # Initialize storage for marginalized NLL arrays.
         self.nllTheta = np.empty((self.ntheta,self.nshear,self.ndata))
@@ -177,15 +166,12 @@ class Estimator(object):
                             model = convolved.shift(dx=dx*self.pixelScale,dy=dy*self.pixelScale)
                             # Render the fully-specified model.
                             pixels = bashes.utility.render(model,scale=self.pixelScale,size=self.stampSize)
-                            if self.featureCalculator:
-                                features = self.featureCalculator.getFeatures(pixels.array)
-                            else:
-                                features = pixels.array.flat
+                            features = self.featureCalculator.getFeatures(pixels.array)
                             self.M[ith,ig,idata,ixy] = features
         # Calculate Mt.Cinv.M
         MtCinvM = self.ivar*np.einsum('abcde,abcde->abcd',self.M,self.M)
         # Calculate Dt.Cinv.M
-        D = self.data.reshape((self.ndata,self.nfeatures))
+        D = self.data.reshape((self.ndata,self.featureCalculator.nfeatures))
         DtCinvM = self.ivar*np.einsum('ce,abcde->abcd',D,self.M)
         # Calculate chisq = (Dt-Mt).Cinv.(D-M) = Dt.Cinv.D - 2*Dt.Cinv.M + Mt.Cinv.M
         chiSq = self.DtCinvD - 2*DtCinvM + MtCinvM
