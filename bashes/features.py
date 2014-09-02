@@ -31,7 +31,7 @@ def circularize(t):
 
 class FeatureCalculator(object):
     """
-    Feature calculator abstract class
+    Feature calculator abstract base class
     """
     def __init__(self, nfeatures):
         self.nfeatures = nfeatures
@@ -39,6 +39,9 @@ class FeatureCalculator(object):
         pass
 
 class FourierMoments(FeatureCalculator):
+    """
+    Calculates fourier domain moment features
+    """
     def __init__(self, stampSize, pixelScale, sigma=None):
         self.stampSize = stampSize
         self.pixelScale = pixelScale
@@ -98,7 +101,7 @@ def main():
     # Parse command-line args.
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--sigma', type = float, default = 1.,
-            help = 'Weight function size')
+        help = 'Weight function size')
     bashes.great3.Observation.addArgs(parser)
     args = parser.parse_args()
 
