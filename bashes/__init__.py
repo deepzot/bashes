@@ -7,5 +7,6 @@ import display
 import config
 
 from _bashes import EstimatorEngine
+from _bashes import getNumGPUs
 from _bashes import printFirst
 from _bashes import timesTwo

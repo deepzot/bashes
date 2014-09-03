@@ -10,6 +10,10 @@
 #define NO_IMPORT_ARRAY
 #include "numpy/arrayobject.h"
 
+#ifdef BUILD_CUDA
+#include <cuda_runtime.h>
+#endif
+
 #include <iostream>
 
 namespace bp = boost::python;
@@ -17,6 +21,17 @@ namespace bp = boost::python;
 namespace bashes {
 
 namespace {
+
+// Returns the number of nvidia GPUs available
+int getNumGPUs() {
+#ifdef BUILD_CUDA
+    int deviceCount;
+    cudaGetDeviceCount(&deviceCount);
+    return deviceCount;
+#else
+    return 0;
+#endif
+}
 
 // Example using only boost::python::numeric::array
 void printFirst(bp::numeric::array data) {
@@ -57,6 +72,7 @@ bp::object timesTwo(bp::numeric::array m){
 
 void pyExportEstimatorHelpers() {
     bp::numeric::array::set_module_and_type("numpy", "ndarray");
+    bp::def("getNumGPUs", &getNumGPUs);
     bp::def("printFirst", &printFirst);
     bp::def("timesTwo", &timesTwo);
 }
