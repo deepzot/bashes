@@ -78,7 +78,7 @@ else:
    if 'CUDA_ROOT' in os.environ:
       cudaRoot = os.environ['CUDA_ROOT']
       env.AppendUnique(LIBPATH=[cudaRoot+'/lib64'])
-print env['CPPDEFINES']
+      env.AppendUnique(CPPPATH=[cudaRoot+'/include'])
 
 # build C++ library
 SConscript('src/SConscript', exports='env')
