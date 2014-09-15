@@ -75,6 +75,7 @@ if not env.WhereIs('nvcc'):
    print 'Will not build CUDA support since nvcc not found.'
 else:
    env.Append(CPPDEFINES={'BUILD_CUDA' : '1'})
+   env.Append(LIBS=['cudart','cudadevrt','cublas'])
    if 'CUDA_ROOT' in os.environ:
       cudaRoot = os.environ['CUDA_ROOT']
       env.AppendUnique(LIBPATH=[cudaRoot+'/lib64'])
