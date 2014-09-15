@@ -19,12 +19,19 @@ pyenv.AppendUnique(LIBPATH=[pyLibDir])
 # python library
 pylib = 'python'+distutils.sysconfig.get_python_version()
 
+# numpy header path
 import numpy
 npInc = numpy.get_include()
 pyenv.AppendUnique(CPPPATH=[npInc])
 
 # bashes C++ library
 pyenv.AppendUnique(LIBPATH=['#lib'])
+
+# Hardcode the path to the bashes shared library in our loadable module.
+# We probably do not want to do this if we will be copying to an install directory,
+# so we are assuming that the module will loaded directly out of the build dir here.
+pyenv.AppendUnique(RPATH=[Dir('#lib').abspath])
+print 'Using RPATH=',pyenv['RPATH']
 
 # build module
 sharedObj = pyenv.SharedObject([
