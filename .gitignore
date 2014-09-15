@@ -37,3 +37,7 @@ config.log
 *.png
 *.npy
 *.yaml
+
+# ipython notebook files
+.ipynb_checkpoints/
+*.ipynb

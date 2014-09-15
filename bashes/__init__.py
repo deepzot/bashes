@@ -5,6 +5,7 @@ import great3
 import utility
 import display
 import config
+import features
 
 from _bashes import EstimatorEngine
 from _bashes import getNumGPUs
