@@ -25,7 +25,7 @@ namespace {
 // Returns the number of nvidia GPUs available
 int getNumGPUs() {
 #ifdef BUILD_CUDA
-    int deviceCount;
+    int deviceCount(0);
     cudaGetDeviceCount(&deviceCount);
     return deviceCount;
 #else
