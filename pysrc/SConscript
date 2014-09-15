@@ -41,6 +41,7 @@ sharedObj = pyenv.SharedObject([
 	'EstimatorHelpers.cc'
 	])
 
+pyenv.Append(LIBS=['boost_python',pylib,'bashes'])
+
 pyenv.LoadableModule(os.path.join('#bashes','_bashes'), sharedObj,
-	LDMODULEPREFIX='', LDMODULESUFFIX='.so',
-	LIBS=['boost_python',pylib,'bashes'])
+	LDMODULEPREFIX='', LDMODULESUFFIX='.so')
