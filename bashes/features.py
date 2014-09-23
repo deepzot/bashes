@@ -5,6 +5,72 @@ import bashes
 import scipy.ndimage
 import scipy.interpolate
 
+class AbsFeatureCalculator(object):
+    """
+    Feature calculator abstract base class.
+
+    Attributes:
+        nfeatures (int): The number of features to calculate.
+
+    Args:
+        nfeatures (int): The number of features to calculate.
+    """
+    def __init__(self, nfeatures):
+        self.nfeatures = nfeatures
+
+    @abc.abstractmethod
+    def getFeatures(self, image, psf):
+        """
+        Returns a flat array of features that are linearly related to image pixels (given the psf).
+
+        Args:
+            image (np.ndarray): A 2D np array of image pixel values.
+            psf (galsim.GSObject): The psf model for the corresponding image.
+        """
+
+    @abc.abstractmethod
+    def getInverseCovariance(self, ivar):
+        """
+        Returns an inverse covariance matrix.
+        """
+
+class PixelFeatures(AbsFeatureCalculator):
+    """
+    Simple pixel feature calculator.
+
+    Attributes:
+        nfeatures (int): The total number of pixels.
+
+    Args:
+        stampSize (int): The postage stamp size in pixels.
+    """
+    def __init__(self, stampSize):
+        self.stampSize = stampSize
+        nfeatures = stampSize*stampSize
+        super(PixelFeatures, self).__init__(nfeatures)
+    def getFeatures(self, image, psf):
+        """
+        Returns a flat array of features that are linearly related to image pixels (given the psf).
+
+        Args:
+            image (np.ndarray): A 2D np array of image pixel values.
+            psf (galsim.GSObject): The psf model for the corresponding image.
+        """
+        return image.flat
+
+    def getInverseCovariance(self, ivar):
+        """
+        Returns an inverse covariance matrix.
+        """
+        if np.isscalar(ivar):
+            return ivar*np.identity(self.nfeatures)
+        elif ivar.shape == (self.stampSize, self.stampSize)
+            return ivar.flat*np.identity(self.nfeatures)
+        elif len(ivar.shape) == self.nfeatures
+            return ivar*np.identity(self.nfeatures)
+        else:
+            assert False, 'Invalid ivar dimensions'
+
 def fourierMatrix(n):
     """
     Returns the fourier transform matrix for a square 2d matrix of size n.
@@ -35,52 +101,6 @@ def circularize(image):
     avgInterp = scipy.interpolate.InterpolatedUnivariateSpline(np.arange(len(avg)),avg)
     avg2d = avgInterp(r.flatten()).reshape(sx,sy)
     return avg2d
-
-class AbsFeatureCalculator(object):
-    """
-    Feature calculator abstract base class.
-
-    Attributes:
-        nfeatures (int): The number of features to calculate.
-
-    Args:
-        nfeatures (int): The number of features to calculate.
-    """
-    def __init__(self, nfeatures):
-        self.nfeatures = nfeatures
-
-    @abc.abstractmethod
-    def getFeatures(self, image, psf):
-        """
-        Returns a flat array of features that are linearly related to image pixels (given the psf).
-
-        Args:
-            image (np.ndarray): A 2D np array of image pixel values.
-            psf (galsim.GSObject): The psf model for the corresponding image.
-        """
-
-class PixelFeatures(AbsFeatureCalculator):
-    """
-    Simple pixel feature calculator.
-
-    Attributes:
-        nfeatures (int): The total number of pixels.
-
-    Args:
-        stampSize (int): The postage stamp size in pixels.
-    """
-    def __init__(self, stampSize):
-        nfeatures = stampSize*stampSize
-        super(PixelFeatures, self).__init__(nfeatures)
-    def getFeatures(self, image, psf):
-        """
-        Returns a flat array of features that are linearly related to image pixels (given the psf).
-
-        Args:
-            image (np.ndarray): A 2D np array of image pixel values.
-            psf (galsim.GSObject): The psf model for the corresponding image.
-        """
-        return image.flat
 
 class FourierMoments(AbsFeatureCalculator):
     """
@@ -158,6 +178,12 @@ class FourierMoments(AbsFeatureCalculator):
         # split complex numbers and recombine into single list [real0, imag0, real1, imag1, ...]
         features = [j for i in zip(complexFeatures.real,complexFeatures.imag) for j in i]
         return features
+
+    def getInverseCovariance(self, ivar):
+        """
+        Returns an inverse covariance matrix.
+        """
+        assert False, 'FourierMoments: Not Implemented'
 
 def main():
     import argparse
