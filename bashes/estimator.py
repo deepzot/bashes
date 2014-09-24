@@ -48,7 +48,8 @@ class Estimator(object):
             for iy in range(ny):
                 for ix in range(nx):
                     pixels = data[iy*stampSize:(iy+1)*stampSize,ix*stampSize:(ix+1)*stampSize]
-                    features = self.featureCalculator.getFeatures(pixels,psfs[iy*nx+ix])
+                    A = self.featureCalculator.getFeatureTransform(psfs[iy*nx+ix])
+                    features = A.dot(pixels.flatten())
                     self.data[iy*nx+ix] = features
         else:
             # Handle a 3D array of data stamps...
@@ -58,7 +59,8 @@ class Estimator(object):
             self.data = np.empty((self.ndata,self.featureCalculator.nfeatures))
             for i in range(self.ndata):
                 pixels = data[i]
-                features = self.featureCalculator.getFeatures(pixels,psfs[i])
+                A = self.featureCalculator.getFeatureTransform(psfs[i])
+                features = A.dot(pixels.flatten())
                 self.data[i] = features
 
         assert len(self.psfs) == self.ndata, 'Expected same number of stamps and PSFs'
@@ -167,7 +169,8 @@ class Estimator(object):
                             model = convolved.shift(dx=dx*self.pixelScale,dy=dy*self.pixelScale)
                             # Render the fully-specified model.
                             pixels = bashes.utility.render(model,scale=self.pixelScale,size=self.stampSize)
-                            features = self.featureCalculator.getFeatures(pixels.array,psf)
+                            A = self.featureCalculator.getFeatureTransform(psf)
+                            features = A.dot(pixels.array.flatten())
                             self.M[ith,ig,idata,ixy] = features
         # Calculate Mt.Cinv.M
         MtCinvM = self.ivar*np.einsum('abcde,abcde->abcd',self.M,self.M)
