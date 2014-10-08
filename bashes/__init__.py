@@ -6,3 +6,5 @@ import utility
 import display
 import config
 import features
+
+import _bashes

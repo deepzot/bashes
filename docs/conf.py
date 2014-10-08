@@ -17,7 +17,7 @@ import os
 
 import mock
  
-MOCK_MODULES = ['numpy', 'scipy', 'matplotlib', 'matplotlib.pyplot', 'scipy.interpolate', 'galsim', 'scipy.ndimage','scipy.special','scipy.stats']
+MOCK_MODULES = ['_bashes','numpy', 'scipy', 'matplotlib', 'matplotlib.pyplot', 'scipy.interpolate', 'scipy.ndimage', 'scipy.special', 'scipy.stats', 'galsim', 'astropy', 'astropy.io']
 for mod_name in MOCK_MODULES:
   sys.modules[mod_name] = mock.Mock()
 
