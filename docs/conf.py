@@ -23,7 +23,7 @@ MOCK_MODULES = [
   'matplotlib',
   'matplotlib.pyplot',
   'scipy.interpolate',
-  'scipy.special'
+  'scipy.special',
   'galsim',
   ]
 for mod_name in MOCK_MODULES:
